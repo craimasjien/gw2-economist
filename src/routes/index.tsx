@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Home page route displaying the TanStack Start landing page.
+ *
+ * This module defines the index route ('/') which serves as the landing page
+ * for the application. It showcases TanStack Start features with a modern,
+ * gradient-styled hero section and feature cards.
+ *
+ * @module routes/index
+ */
+
 import { createFileRoute } from '@tanstack/react-router'
 import {
   Zap,
@@ -8,8 +18,19 @@ import {
   Sparkles,
 } from 'lucide-react'
 
+/**
+ * Index route configuration for the home page.
+ */
 export const Route = createFileRoute('/')({ component: App })
 
+/**
+ * Home page component displaying TanStack Start features.
+ *
+ * Renders a hero section with logo and tagline, followed by a grid
+ * of feature cards highlighting the framework's capabilities.
+ *
+ * @returns The home page layout with hero and features sections
+ */
 function App() {
   const features = [
     {

@@ -1,3 +1,27 @@
+/**
+ * @fileoverview Header component with slide-out navigation drawer.
+ *
+ * This module provides the main header and navigation component for the application.
+ * It includes a hamburger menu that opens a slide-out sidebar with navigation links
+ * to all application routes, including collapsible sub-menus for grouped routes.
+ *
+ * @module components/Header
+ *
+ * @example
+ * ```tsx
+ * import Header from '@/components/Header'
+ *
+ * function App() {
+ *   return (
+ *     <>
+ *       <Header />
+ *       <main>...</main>
+ *     </>
+ *   )
+ * }
+ * ```
+ */
+
 import { Link } from '@tanstack/react-router'
 
 import { useState } from 'react'
@@ -12,6 +36,15 @@ import {
   X,
 } from 'lucide-react'
 
+/**
+ * Header component with slide-out navigation drawer.
+ *
+ * Renders a fixed header bar with a hamburger menu button and logo.
+ * When the menu is opened, a slide-out drawer appears from the left
+ * containing navigation links to all application routes.
+ *
+ * @returns The header element with navigation drawer.
+ */
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [groupedExpanded, setGroupedExpanded] = useState<

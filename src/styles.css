@@ -1,3 +1,14 @@
+/**
+ * Global Styles for GW2 Economist Application
+ *
+ * This stylesheet imports Tailwind CSS and defines global base styles
+ * for the application. It sets up the default font stack for body text
+ * and monospace fonts for code elements.
+ *
+ * Usage: This file is imported in the root route (__root.tsx) and
+ * applies to all pages in the application.
+ */
+
 @import "tailwindcss";
 
 body {

@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Demo page showcasing TanStack Start server functions.
+ *
+ * This module demonstrates server functions (similar to server actions) in
+ * TanStack Start. It implements a todo list that persists to a JSON file
+ * on the server, showcasing how server functions can handle both GET and
+ * POST operations with type-safe input validation.
+ *
+ * @module routes/demo/start.server-funcs
+ */
+
 import fs from 'node:fs'
 import { useCallback, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
@@ -15,8 +26,14 @@ const loggedServerFunction = createServerFn({ method: "GET" }).middleware([
 ]);
 */
 
+/** File path for persisting todos on the server */
 const TODOS_FILE = 'todos.json'
 
+/**
+ * Reads todos from the JSON file, returning default todos if file doesn't exist.
+ *
+ * @returns Promise resolving to an array of todo objects
+ */
 async function readTodos() {
   return JSON.parse(
     await fs.promises.readFile(TODOS_FILE, 'utf-8').catch(() =>
@@ -32,10 +49,24 @@ async function readTodos() {
   )
 }
 
+/**
+ * Server function to retrieve all todos.
+ *
+ * @returns Promise resolving to the array of todos
+ */
 const getTodos = createServerFn({
   method: 'GET',
 }).handler(async () => await readTodos())
 
+/**
+ * Server function to add a new todo item.
+ *
+ * Validates the input as a string, adds it to the todos list,
+ * and persists the updated list to the JSON file.
+ *
+ * @param data - The todo name/description to add
+ * @returns Promise resolving to the updated todos array
+ */
 const addTodo = createServerFn({ method: 'POST' })
   .inputValidator((d: string) => d)
   .handler(async ({ data }) => {
@@ -45,11 +76,24 @@ const addTodo = createServerFn({ method: 'POST' })
     return todos
   })
 
+/**
+ * Route configuration for the server functions demo page.
+ *
+ * Uses a loader to pre-fetch todos before rendering the component.
+ */
 export const Route = createFileRoute('/demo/start/server-funcs')({
   component: Home,
   loader: async () => await getTodos(),
 })
 
+/**
+ * Server functions demo component.
+ *
+ * Displays a todo list with the ability to add new items.
+ * Demonstrates server function usage for both data loading and mutations.
+ *
+ * @returns The todo list demo page
+ */
 function Home() {
   const router = useRouter()
   let todos = Route.useLoaderData()

@@ -1,9 +1,32 @@
+/**
+ * @fileoverview Index page for the SSR demos section.
+ *
+ * This module provides a navigation hub for the various SSR (Server-Side Rendering)
+ * demo pages. It displays links to SPA Mode, Full SSR, and Data Only rendering modes,
+ * helping users understand the different SSR strategies available in TanStack Start.
+ *
+ * @module routes/demo/start.ssr.index
+ */
+
 import { createFileRoute, Link } from '@tanstack/react-router'
 
+/**
+ * Route configuration for the SSR demos index page.
+ */
 export const Route = createFileRoute('/demo/start/ssr/')({
   component: RouteComponent,
 })
 
+/**
+ * SSR demos navigation component.
+ *
+ * Displays styled links to the three SSR demo modes:
+ * - SPA Mode: Client-side only rendering
+ * - Full SSR: Complete server-side rendering
+ * - Data Only: Server-side data loading with client-side rendering
+ *
+ * @returns Navigation page for SSR demos
+ */
 function RouteComponent() {
   return (
     <div

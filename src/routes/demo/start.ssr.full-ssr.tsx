@@ -1,11 +1,35 @@
+/**
+ * @fileoverview Full SSR demo page.
+ *
+ * This module demonstrates full server-side rendering in TanStack Start
+ * where both data loading and component rendering occur on the server.
+ * The page is fully rendered with data before being sent to the client.
+ *
+ * @module routes/demo/start.ssr.full-ssr
+ */
+
 import { createFileRoute } from '@tanstack/react-router'
 import { getPunkSongs } from '@/data/demo.punk-songs'
 
+/**
+ * Route configuration for full SSR mode demo.
+ *
+ * Uses a loader to fetch data on the server, with the component
+ * fully rendered server-side before being sent to the client.
+ */
 export const Route = createFileRoute('/demo/start/ssr/full-ssr')({
   component: RouteComponent,
   loader: async () => await getPunkSongs(),
 })
 
+/**
+ * Full SSR demo component.
+ *
+ * Displays punk songs that were loaded server-side via the route loader.
+ * The entire page including data is rendered on the server.
+ *
+ * @returns The full SSR demo page with server-rendered song list
+ */
 function RouteComponent() {
   const punkSongs = Route.useLoaderData()
 

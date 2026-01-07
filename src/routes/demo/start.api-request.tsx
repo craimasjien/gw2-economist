@@ -1,15 +1,41 @@
+/**
+ * @fileoverview Demo page showcasing API request functionality.
+ *
+ * This module demonstrates how to fetch data from an API endpoint
+ * within a TanStack Start application. It fetches a list of names
+ * from the `/demo/api/names` endpoint and displays them in a styled list.
+ *
+ * @module routes/demo/start.api-request
+ */
+
 import { useEffect, useState } from 'react'
 
 import { createFileRoute } from '@tanstack/react-router'
 
+/**
+ * Fetches the list of names from the API endpoint.
+ *
+ * @returns Promise resolving to an array of name strings
+ */
 function getNames() {
   return fetch('/demo/api/names').then((res) => res.json() as Promise<string[]>)
 }
 
+/**
+ * Route configuration for the API request demo page.
+ */
 export const Route = createFileRoute('/demo/start/api-request')({
   component: Home,
 })
 
+/**
+ * API request demo component.
+ *
+ * Fetches and displays a list of names from the API endpoint
+ * using client-side data fetching with useEffect.
+ *
+ * @returns The demo page with a list of fetched names
+ */
 function Home() {
   const [names, setNames] = useState<Array<string>>([])
 

@@ -1,12 +1,36 @@
+/**
+ * @fileoverview Data-only SSR demo page.
+ *
+ * This module demonstrates the 'data-only' SSR mode in TanStack Start where
+ * data is fetched on the server but component rendering happens on the client.
+ * This provides fast data loading while keeping the rendering lightweight.
+ *
+ * @module routes/demo/start.ssr.data-only
+ */
+
 import { createFileRoute } from '@tanstack/react-router'
 import { getPunkSongs } from '@/data/demo.punk-songs'
 
+/**
+ * Route configuration for data-only SSR mode demo.
+ *
+ * Sets `ssr: 'data-only'` to fetch data on the server while
+ * allowing component rendering to happen on the client.
+ */
 export const Route = createFileRoute('/demo/start/ssr/data-only')({
   ssr: 'data-only',
   component: RouteComponent,
   loader: async () => await getPunkSongs(),
 })
 
+/**
+ * Data-only SSR demo component.
+ *
+ * Displays punk songs with data pre-loaded server-side but component
+ * rendered client-side. Demonstrates the hybrid SSR approach.
+ *
+ * @returns The data-only SSR demo page with server-loaded song data
+ */
 function RouteComponent() {
   const punkSongs = Route.useLoaderData()
 

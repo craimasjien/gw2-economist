@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+When creating Typescript files, make sure to fully implement TSDoc. Make sure that every file created, also non typescript files, have a summary on the top of the file that explains what the file does, what its purpose is and how to use it. 

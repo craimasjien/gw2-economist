@@ -1,12 +1,37 @@
+/**
+ * @fileoverview SPA Mode SSR demo page.
+ *
+ * This module demonstrates SPA (Single Page Application) mode in TanStack Start
+ * where SSR is disabled (`ssr: false`). The component renders entirely on the
+ * client-side, fetching data after the initial render using useEffect.
+ *
+ * @module routes/demo/start.ssr.spa-mode
+ */
+
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { getPunkSongs } from '@/data/demo.punk-songs'
 
+/**
+ * Route configuration for SPA mode demo.
+ *
+ * Sets `ssr: false` to disable server-side rendering,
+ * making this page render entirely on the client.
+ */
 export const Route = createFileRoute('/demo/start/ssr/spa-mode')({
   ssr: false,
   component: RouteComponent,
 })
 
+/**
+ * SPA mode demo component.
+ *
+ * Fetches punk songs data client-side using useEffect and displays
+ * them in a styled list. Demonstrates client-only data fetching
+ * when SSR is disabled.
+ *
+ * @returns The SPA mode demo page with client-fetched song list
+ */
 function RouteComponent() {
   const [punkSongs, setPunkSongs] = useState<
     Awaited<ReturnType<typeof getPunkSongs>>
