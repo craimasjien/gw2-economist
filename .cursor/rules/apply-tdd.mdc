@@ -2,4 +2,4 @@
 alwaysApply: true
 ---
 
-Always apply TDD where applicable.
+Always apply TDD where applicable. Check the code created using code coverage reports in the coverage folder. Only accept new code if the code coverage does NOT DECREASE. 

@@ -38,6 +38,30 @@ describe("PriceDisplay", () => {
       const result = formatPrice(9999999);
       expect(result).toEqual({ gold: 999, silver: 99, copper: 99 });
     });
+
+    it("handles floating-point precision errors", () => {
+      // This is the bug case: 72.80000000000018 should display as 73c (rounded)
+      const result = formatPrice(72.80000000000018);
+      expect(result).toEqual({ gold: 0, silver: 0, copper: 73 });
+    });
+
+    it("handles fractional copper values by rounding", () => {
+      // 12345.6 should round to 12346
+      const result = formatPrice(12345.6);
+      expect(result).toEqual({ gold: 1, silver: 23, copper: 46 });
+    });
+
+    it("handles negative floating-point errors", () => {
+      // 72.9999999999 should round to 73
+      const result = formatPrice(72.9999999999);
+      expect(result).toEqual({ gold: 0, silver: 0, copper: 73 });
+    });
+
+    it("handles values that round down", () => {
+      // 72.3 should round to 72
+      const result = formatPrice(72.3);
+      expect(result).toEqual({ gold: 0, silver: 0, copper: 72 });
+    });
   });
 
   describe("PriceDisplay component", () => {

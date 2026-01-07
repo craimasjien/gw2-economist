@@ -64,10 +64,18 @@ export interface PriceDisplayProps {
  *
  * @param copper - Value in copper coins
  * @returns Parsed price with gold, silver, copper
+ *
+ * @remarks
+ * The input is rounded to the nearest integer to handle floating-point
+ * precision errors that can occur from division operations in price
+ * calculations (e.g., 72.80000000000018 becomes 73).
  */
 export function formatPrice(copper: number): ParsedPrice {
-  const gold = Math.floor(copper / 10000);
-  const remaining = copper % 10000;
+  // Round to nearest integer to fix floating-point precision errors
+  const roundedCopper = Math.round(copper);
+
+  const gold = Math.floor(roundedCopper / 10000);
+  const remaining = roundedCopper % 10000;
   const silver = Math.floor(remaining / 100);
   const copperCoins = remaining % 100;
 
