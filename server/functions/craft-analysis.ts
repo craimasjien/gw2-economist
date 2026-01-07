@@ -24,11 +24,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "../db";
 import { createExtendedDataAccess } from "../services/data-access";
-import {
-  CraftCalculatorService,
-  type CraftAnalysis,
-} from "../services/craft-calculator.service";
+import { CraftCalculatorService } from "../services/craft-calculator.service";
 import type { Item, Price } from "../db/schema";
+import {
+  serializeItem,
+  serializeCraftAnalysis,
+  type SerializedItem,
+  type SerializedCraftAnalysis,
+} from "./serializers";
 
 /**
  * Schema for item search input validation.
@@ -54,105 +57,8 @@ export interface ItemSearchResult {
   hasCraftingRecipe: boolean;
 }
 
-/**
- * Serializable version of CraftAnalysis for transport.
- * Dates are converted to ISO strings for JSON serialization.
- */
-export interface SerializedCraftAnalysis {
-  item: SerializedItem;
-  recipe: {
-    id: number;
-    type: string;
-    outputItemId: number;
-    outputItemCount: number;
-    disciplines: string[];
-  };
-  buyPrice: number;
-  craftCost: number;
-  recommendation: "buy" | "craft";
-  savings: number;
-  savingsPercent: number;
-  materials: SerializedMaterialBreakdown[];
-}
-
-/**
- * Serializable item type.
- */
-export interface SerializedItem {
-  id: number;
-  name: string;
-  description: string | null;
-  type: string;
-  rarity: string;
-  level: number;
-  icon: string | null;
-  vendorValue: number;
-  chatLink: string | null;
-}
-
-/**
- * Serializable material breakdown.
- */
-export interface SerializedMaterialBreakdown {
-  item: SerializedItem;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  canCraft: boolean;
-  usedBuyPrice: boolean;
-  craftAnalysis?: SerializedCraftAnalysis;
-}
-
-/**
- * Converts an Item to a serializable format.
- */
-function serializeItem(item: Item): SerializedItem {
-  return {
-    id: item.id,
-    name: item.name,
-    description: item.description,
-    type: item.type,
-    rarity: item.rarity,
-    level: item.level,
-    icon: item.icon,
-    vendorValue: item.vendorValue,
-    chatLink: item.chatLink,
-  };
-}
-
-/**
- * Converts CraftAnalysis to a serializable format.
- */
-function serializeCraftAnalysis(
-  analysis: CraftAnalysis
-): SerializedCraftAnalysis {
-  return {
-    item: serializeItem(analysis.item),
-    recipe: {
-      id: analysis.recipe.id,
-      type: analysis.recipe.type,
-      outputItemId: analysis.recipe.outputItemId,
-      outputItemCount: analysis.recipe.outputItemCount,
-      disciplines: analysis.recipe.disciplines,
-    },
-    buyPrice: analysis.buyPrice,
-    craftCost: analysis.craftCost,
-    recommendation: analysis.recommendation,
-    savings: analysis.savings,
-    savingsPercent: analysis.savingsPercent,
-    materials: analysis.materials.map((m) => ({
-      item: serializeItem(m.item),
-      quantity: m.quantity,
-      unitPrice: m.unitPrice,
-      totalPrice: m.totalPrice,
-      canCraft: m.canCraft,
-      usedBuyPrice: m.usedBuyPrice,
-      craftAnalysis: m.craftAnalysis
-        ? serializeCraftAnalysis(m.craftAnalysis)
-        : undefined,
-    })),
-  };
-}
+// Re-export serializer types for consumers
+export type { SerializedItem, SerializedCraftAnalysis };
 
 /**
  * Server function to search for items by name.

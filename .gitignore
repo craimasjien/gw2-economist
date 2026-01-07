@@ -14,3 +14,6 @@ todos.json
 
 # API cache directory
 cache/
+
+# Test coverage reports
+coverage/

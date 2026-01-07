@@ -60,7 +60,7 @@ function mockFetchResponse<T>(data: T, status = 200): Response {
 describe("GW2ApiClient", () => {
   let client: GW2ApiClient;
   let mockCache: MockCache;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn<typeof globalThis, "fetch">>;
 
   beforeEach(() => {
     mockCache = new MockCache();
@@ -289,6 +289,15 @@ describe("GW2ApiClient", () => {
       chat_link: "[&CAAABQA=]",
     };
 
+    const mockRecipes: GW2Recipe[] = [
+      mockRecipe,
+      {
+        ...mockRecipe,
+        id: 1001,
+        output_item_id: 12346,
+      },
+    ];
+
     it("should fetch all recipe IDs", async () => {
       const mockIds = [1000, 1001, 1002];
       fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockIds));
@@ -298,12 +307,39 @@ describe("GW2ApiClient", () => {
       expect(ids).toEqual(mockIds);
     });
 
+    it("should use cached recipe IDs when available", async () => {
+      const mockIds = [1000, 1001];
+      await mockCache.set("ids/recipes", mockIds);
+
+      const ids = await client.getAllRecipeIds();
+
+      expect(ids).toEqual(mockIds);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it("should fetch a single recipe by ID", async () => {
       fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockRecipe));
 
       const recipe = await client.getRecipe(1000);
 
       expect(recipe).toEqual(mockRecipe);
+    });
+
+    it("should use cached recipe when available", async () => {
+      await mockCache.set("recipes/1000", mockRecipe);
+
+      const recipe = await client.getRecipe(1000);
+
+      expect(recipe).toEqual(mockRecipe);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("should return null for non-existent recipes", async () => {
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse({ text: "not found" }, 404));
+
+      const recipe = await client.getRecipe(99999);
+
+      expect(recipe).toBeNull();
     });
 
     it("should fetch recipes by output item ID", async () => {
@@ -318,6 +354,136 @@ describe("GW2ApiClient", () => {
         expect.any(Object)
       );
     });
+
+    it("should use cached recipes by output item when available", async () => {
+      const mockIds = [1000, 1001];
+      await mockCache.set("recipes/search/output/12345", mockIds);
+
+      const ids = await client.getRecipesByOutputItem(12345);
+
+      expect(ids).toEqual(mockIds);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    describe("getRecipes (batch)", () => {
+      it("should fetch multiple recipes by ID array", async () => {
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockRecipes));
+
+        const recipes = await client.getRecipes([1000, 1001]);
+
+        expect(recipes).toHaveLength(2);
+        expect(recipes).toEqual(mockRecipes);
+      });
+
+      it("should return empty array for empty ID list", async () => {
+        const recipes = await client.getRecipes([]);
+
+        expect(recipes).toEqual([]);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      });
+
+      it("should use cached recipes and only fetch uncached ones", async () => {
+        await mockCache.set("recipes/1000", mockRecipes[0]);
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse([mockRecipes[1]]));
+
+        const recipes = await client.getRecipes([1000, 1001]);
+
+        expect(recipes).toHaveLength(2);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          "https://api.guildwars2.com/v2/recipes?ids=1001",
+          expect.any(Object)
+        );
+      });
+
+      it("should cache newly fetched recipes", async () => {
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockRecipes));
+
+        await client.getRecipes([1000, 1001]);
+
+        expect(await mockCache.get("recipes/1000")).toEqual(mockRecipes[0]);
+        expect(await mockCache.get("recipes/1001")).toEqual(mockRecipes[1]);
+      });
+
+      it("should handle fetch errors gracefully", async () => {
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        fetchSpy.mockRejectedValueOnce(new Error("Network error"));
+
+        const recipes = await client.getRecipes([1000, 1001]);
+
+        expect(recipes).toEqual([]);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Failed to fetch recipes batch:",
+          expect.any(Error)
+        );
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe("getRecipesBatch (large batch with progress)", () => {
+      it("should batch requests in chunks of 200", async () => {
+        const ids = Array.from({ length: 450 }, (_, i) => i + 1);
+        const batch1 = ids.slice(0, 200).map((id) => ({ ...mockRecipe, id }));
+        const batch2 = ids.slice(200, 400).map((id) => ({ ...mockRecipe, id }));
+        const batch3 = ids.slice(400, 450).map((id) => ({ ...mockRecipe, id }));
+
+        fetchSpy
+          .mockResolvedValueOnce(mockFetchResponse(batch1))
+          .mockResolvedValueOnce(mockFetchResponse(batch2))
+          .mockResolvedValueOnce(mockFetchResponse(batch3));
+
+        const result = await client.getRecipesBatch(ids);
+
+        expect(result.items).toHaveLength(450);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+      });
+
+      it("should report progress during batch fetching", async () => {
+        const ids = [1000, 1001, 1002];
+        const mockItems = ids.map((id) => ({ ...mockRecipe, id }));
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockItems));
+
+        const progressUpdates: Array<{ current: number; total: number }> = [];
+
+        await client.getRecipesBatch(ids, (progress) => {
+          progressUpdates.push({ ...progress });
+        });
+
+        expect(progressUpdates.length).toBeGreaterThan(0);
+        expect(progressUpdates[progressUpdates.length - 1].current).toBe(ids.length);
+      });
+
+      it("should track failed IDs", async () => {
+        const ids = [1000, 1001, 1002];
+        const mockItems = [
+          { ...mockRecipe, id: 1000 },
+          { ...mockRecipe, id: 1001 },
+        ];
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockItems));
+
+        const result = await client.getRecipesBatch(ids);
+
+        expect(result.items).toHaveLength(2);
+        expect(result.failedIds).toContain(1002);
+      });
+
+      it("should handle batch errors and track failed IDs as missing items", async () => {
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const ids = [1000, 1001, 1002];
+        fetchSpy.mockRejectedValueOnce(new Error("Batch failed"));
+
+        const result = await client.getRecipesBatch(ids);
+
+        // When getRecipes catches the error, it returns empty array
+        // So getRecipesBatch sees all IDs as "failed" (not returned)
+        expect(result.items).toHaveLength(0);
+        expect(result.failedIds).toEqual(ids);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Failed to fetch recipes batch:",
+          expect.any(Error)
+        );
+        consoleSpy.mockRestore();
+      });
+    });
   });
 
   describe("prices", () => {
@@ -328,6 +494,16 @@ describe("GW2ApiClient", () => {
       sells: { quantity: 500, unit_price: 600 },
     };
 
+    const mockPrices: GW2Price[] = [
+      mockPrice,
+      {
+        id: 12346,
+        whitelisted: true,
+        buys: { quantity: 800, unit_price: 400 },
+        sells: { quantity: 400, unit_price: 500 },
+      },
+    ];
+
     it("should fetch all tradable item IDs", async () => {
       const mockIds = [1, 2, 3];
       fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockIds));
@@ -335,6 +511,16 @@ describe("GW2ApiClient", () => {
       const ids = await client.getAllPriceIds();
 
       expect(ids).toEqual(mockIds);
+    });
+
+    it("should use cached price IDs when available", async () => {
+      const mockIds = [1, 2, 3];
+      await mockCache.set("ids/prices", mockIds);
+
+      const ids = await client.getAllPriceIds();
+
+      expect(ids).toEqual(mockIds);
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
     it("should fetch price for a single item", async () => {
@@ -345,12 +531,141 @@ describe("GW2ApiClient", () => {
       expect(price).toEqual(mockPrice);
     });
 
+    it("should use cached price when available", async () => {
+      await mockCache.set("prices/12345", mockPrice);
+
+      const price = await client.getPrice(12345);
+
+      expect(price).toEqual(mockPrice);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it("should return null for non-tradable items", async () => {
       fetchSpy.mockResolvedValueOnce(mockFetchResponse({ text: "no such id" }, 404));
 
       const price = await client.getPrice(99999);
 
       expect(price).toBeNull();
+    });
+
+    describe("getPrices (batch)", () => {
+      it("should fetch multiple prices by ID array", async () => {
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockPrices));
+
+        const prices = await client.getPrices([12345, 12346]);
+
+        expect(prices).toHaveLength(2);
+        expect(prices).toEqual(mockPrices);
+      });
+
+      it("should return empty array for empty ID list", async () => {
+        const prices = await client.getPrices([]);
+
+        expect(prices).toEqual([]);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      });
+
+      it("should use cached prices and only fetch uncached ones", async () => {
+        await mockCache.set("prices/12345", mockPrices[0]);
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse([mockPrices[1]]));
+
+        const prices = await client.getPrices([12345, 12346]);
+
+        expect(prices).toHaveLength(2);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          "https://api.guildwars2.com/v2/commerce/prices?ids=12346",
+          expect.any(Object)
+        );
+      });
+
+      it("should cache newly fetched prices", async () => {
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockPrices));
+
+        await client.getPrices([12345, 12346]);
+
+        expect(await mockCache.get("prices/12345")).toEqual(mockPrices[0]);
+        expect(await mockCache.get("prices/12346")).toEqual(mockPrices[1]);
+      });
+
+      it("should handle fetch errors gracefully", async () => {
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        fetchSpy.mockRejectedValueOnce(new Error("Network error"));
+
+        const prices = await client.getPrices([12345, 12346]);
+
+        expect(prices).toEqual([]);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Failed to fetch prices batch:",
+          expect.any(Error)
+        );
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe("getPricesBatch (large batch with progress)", () => {
+      it("should batch requests in chunks of 200", async () => {
+        const ids = Array.from({ length: 450 }, (_, i) => i + 1);
+        const batch1 = ids.slice(0, 200).map((id) => ({ ...mockPrice, id }));
+        const batch2 = ids.slice(200, 400).map((id) => ({ ...mockPrice, id }));
+        const batch3 = ids.slice(400, 450).map((id) => ({ ...mockPrice, id }));
+
+        fetchSpy
+          .mockResolvedValueOnce(mockFetchResponse(batch1))
+          .mockResolvedValueOnce(mockFetchResponse(batch2))
+          .mockResolvedValueOnce(mockFetchResponse(batch3));
+
+        const result = await client.getPricesBatch(ids);
+
+        expect(result.items).toHaveLength(450);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+      });
+
+      it("should report progress during batch fetching", async () => {
+        const ids = [12345, 12346, 12347];
+        const mockItems = ids.map((id) => ({ ...mockPrice, id }));
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockItems));
+
+        const progressUpdates: Array<{ current: number; total: number }> = [];
+
+        await client.getPricesBatch(ids, (progress) => {
+          progressUpdates.push({ ...progress });
+        });
+
+        expect(progressUpdates.length).toBeGreaterThan(0);
+        expect(progressUpdates[progressUpdates.length - 1].current).toBe(ids.length);
+      });
+
+      it("should track failed IDs", async () => {
+        const ids = [12345, 12346, 12347];
+        const mockItems = [
+          { ...mockPrice, id: 12345 },
+          { ...mockPrice, id: 12346 },
+        ];
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockItems));
+
+        const result = await client.getPricesBatch(ids);
+
+        expect(result.items).toHaveLength(2);
+        expect(result.failedIds).toContain(12347);
+      });
+
+      it("should handle batch errors and track failed IDs as missing items", async () => {
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const ids = [12345, 12346, 12347];
+        fetchSpy.mockRejectedValueOnce(new Error("Batch failed"));
+
+        const result = await client.getPricesBatch(ids);
+
+        // When getPrices catches the error, it returns empty array
+        // So getPricesBatch sees all IDs as "failed" (not returned)
+        expect(result.items).toHaveLength(0);
+        expect(result.failedIds).toEqual(ids);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Failed to fetch prices batch:",
+          expect.any(Error)
+        );
+        consoleSpy.mockRestore();
+      });
     });
   });
 
@@ -452,6 +767,137 @@ describe("GW2ApiClient", () => {
       await client.clearCache();
 
       expect(mockCache.getStore().size).toBe(0);
+    });
+  });
+
+  describe("timeout handling", () => {
+    it("should abort request after timeout", async () => {
+      const clientWithShortTimeout = new GW2ApiClient({
+        cache: mockCache,
+        timeout: 100,
+      });
+
+      // Create an abort error
+      const abortError = new Error("The operation was aborted");
+      abortError.name = "AbortError";
+      fetchSpy.mockRejectedValueOnce(abortError);
+
+      await expect(clientWithShortTimeout.getAllItemIds()).rejects.toThrow(
+        "Request timeout"
+      );
+    });
+  });
+
+  describe("API error handling", () => {
+    it("should throw on non-OK response with error text", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ text: "Server error occurred" }, 500)
+      );
+
+      await expect(client.getAllItemIds()).rejects.toThrow(
+        "GW2 API error (500): Server error occurred"
+      );
+    });
+
+    it("should throw on non-OK response without error text", async () => {
+      const response = {
+        ok: false,
+        status: 503,
+        statusText: "Service Unavailable",
+        json: async () => {
+          throw new Error("No JSON");
+        },
+      } as unknown as Response;
+      fetchSpy.mockResolvedValueOnce(response);
+
+      await expect(client.getAllItemIds()).rejects.toThrow(
+        "GW2 API error (503): Service Unavailable"
+      );
+    });
+
+    it("should handle getItems batch fetch errors gracefully", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      fetchSpy.mockRejectedValueOnce(new Error("Network error"));
+
+      const items = await client.getItems([1, 2, 3]);
+
+      expect(items).toEqual([]);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to fetch items batch:",
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should re-throw non-AbortError exceptions", async () => {
+      const customError = new Error("Custom network failure");
+      fetchSpy.mockRejectedValueOnce(customError);
+
+      await expect(client.getAllItemIds()).rejects.toThrow("Custom network failure");
+    });
+  });
+
+  describe("constructor defaults", () => {
+    it("should use environment API key when not provided", async () => {
+      const originalKey = process.env.GW2_API_KEY;
+      process.env.GW2_API_KEY = "env-test-key";
+
+      const clientFromEnv = new GW2ApiClient({ cache: mockCache });
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse([1, 2, 3]));
+
+      await clientFromEnv.getAllItemIds();
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer env-test-key",
+          }),
+        })
+      );
+
+      process.env.GW2_API_KEY = originalKey;
+    });
+
+    it("should use default timeout when not provided", () => {
+      const clientDefault = new GW2ApiClient({ cache: mockCache });
+      // The default timeout is 30000ms - we can't easily test this directly
+      // but we can verify the client is created successfully
+      expect(clientDefault).toBeDefined();
+    });
+  });
+
+  describe("batch progress edge cases", () => {
+    it("should handle getItemsBatch with errors and track all IDs as failed", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const ids = [1, 2, 3];
+      fetchSpy.mockRejectedValueOnce(new Error("Batch error"));
+
+      const result = await client.getItemsBatch(ids);
+
+      // getItems catches errors, returns empty array
+      // So getItemsBatch sees all IDs as missing/failed
+      expect(result.items).toHaveLength(0);
+      expect(result.failedIds).toEqual(ids);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to fetch items batch:",
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle string errors in batch and track IDs as failed", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const ids = [1, 2, 3];
+      fetchSpy.mockRejectedValueOnce("String error");
+
+      const result = await client.getItemsBatch(ids);
+
+      expect(result.failedIds).toEqual(ids);
+      // The error is logged but not captured in errors array
+      // because getItems catches it and doesn't throw
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
   });
 });

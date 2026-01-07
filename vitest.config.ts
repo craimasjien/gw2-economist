@@ -43,8 +43,37 @@ export default defineConfig({
     include: ["**/*.{test,spec}.{ts,tsx}"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html"],
-      exclude: ["node_modules/", "tests/setup.ts"],
+      reporter: ["text", "json", "html", "lcov"],
+      reportsDirectory: "./coverage",
+      exclude: [
+        "node_modules/",
+        "tests/**",
+        "**/*.test.{ts,tsx}",
+        "**/*.spec.{ts,tsx}",
+        "**/*.d.ts",
+        "**/types.ts",
+        // Generated files
+        "src/routeTree.gen.ts",
+        // Build/config files
+        "drizzle/**",
+        "scripts/**",
+        "vite.config.ts",
+        "vitest.config.ts",
+        "drizzle.config.ts",
+        // Route files (TanStack Router config, not business logic)
+        "src/routes/**",
+        "src/router.tsx",
+        // Barrel exports (re-exports only)
+        "server/services/gw2-api/index.ts",
+        // Database connection (requires real DB)
+        "server/db/index.ts",
+        // Demo/sample data
+        "src/data/**",
+        // Server function handlers (require integration tests)
+        "server/functions/craft-analysis.ts",
+      ],
+      include: ["src/**/*.{ts,tsx}", "server/**/*.{ts,tsx}"],
+      all: true,
     },
   },
 });
