@@ -36,6 +36,7 @@ import {
   StickyNote,
   X,
   Hammer,
+  TrendingUp,
 } from 'lucide-react'
 
 /**
@@ -183,6 +184,11 @@ export default function Header() {
           {/* Home Link */}
           <NavLink to="/" icon={<Home size={20} />} onClick={() => setIsOpen(false)}>
             Home
+          </NavLink>
+
+          {/* Opportunities Link */}
+          <NavLink to="/opportunities" icon={<TrendingUp size={20} />} onClick={() => setIsOpen(false)}>
+            Profit Opportunities
           </NavLink>
 
           {/* Demo Links Section */}

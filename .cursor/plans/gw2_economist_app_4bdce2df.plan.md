@@ -139,6 +139,8 @@ graph TB
     DataSync --> DrizzleORM
 ```
 
+
+
 ## TDD Methodology
 
 This project follows **Test-Driven Development (TDD)**. For each feature:
@@ -217,6 +219,8 @@ gw2-economist/
     └── setup.ts
 ```
 
+
+
 ## Phase 1: Project Foundation
 
 ### 1.1 Initialize TanStack Start Project
@@ -233,6 +237,8 @@ Install additional dependencies:
 pnpm add drizzle-orm postgres dotenv zod
 pnpm add -D drizzle-kit vitest @testing-library/react jsdom tsx
 ```
+
+
 
 ### 1.2 Docker Compose Setup
 
@@ -254,6 +260,8 @@ services:
 volumes:
   postgres_data:
 ```
+
+
 
 ### 1.3 Environment Configuration
 
@@ -291,6 +299,8 @@ describe('Database Schema', () => {
 })
 ```
 
+
+
 ### 2.2 Drizzle Schema
 
 Define schema in `server/db/schema.ts` with three main tables:| Table | Purpose | Key Fields ||-------|---------|------------|| `items` | All GW2 items | id, name, type, rarity, icon, vendorValue || `recipes` | Crafting recipes | id, outputItemId, outputCount, disciplines, ingredients (JSON) || `prices` | Trading post prices | itemId, buyPrice, sellPrice, supply, demand, updatedAt |
@@ -322,6 +332,8 @@ describe('GW2ApiClient', () => {
 })
 ```
 
+
+
 ### 3.2 API Client with Cache Toggle
 
 Implement `server/services/gw2-api/client.ts`:
@@ -350,6 +362,8 @@ interface CacheAdapter {
 }
 ```
 
+
+
 - Store data as JSON files in `cache/{endpoint}/{id}.json`
 - Include TTL metadata for cache invalidation
 
@@ -372,6 +386,8 @@ Add to `package.json`:
   }
 }
 ```
+
+
 
 ### 4.2 Sync Logic
 
@@ -422,6 +438,8 @@ describe('CraftCalculatorService', () => {
 })
 ```
 
+
+
 ### 5.2 Core Algorithm
 
 Implement `server/services/craft-calculator.service.ts`:
@@ -467,6 +485,8 @@ export const searchItems = createServerFn({ method: 'GET' })
   })
 ```
 
+
+
 ## Phase 6: Frontend UI
 
 ### 6.1 Tests First: Component Tests
@@ -495,6 +515,8 @@ describe('CraftAnalysis', () => {
   it('shows material breakdown tree', () => {})
 })
 ```
+
+
 
 ### 6.2 Routes
 
@@ -535,6 +557,8 @@ sequenceDiagram
     ServerFn-->>UI: Display recommendation
 ```
 
+
+
 ## Phase 7: Historical Price Tracking and Profit Discovery
 
 ### Goal
@@ -565,11 +589,7 @@ export const priceHistory = pgTable(
 );
 ```
 
-| Table | Purpose | Key Fields |
-
-|-------|---------|------------|
-
-| `price_history` | Hourly snapshots | itemId, buyPrice, sellPrice, buyQuantity, sellQuantity, recordedAt |
+| Table | Purpose | Key Fields ||-------|---------|------------|| `price_history` | Hourly snapshots | itemId, buyPrice, sellPrice, buyQuantity, sellQuantity, recordedAt |
 
 ### 7.2 Tests First: Schema Validation
 
@@ -581,6 +601,8 @@ describe('price_history table', () => {
   it('supports efficient time-range queries', () => {})
 })
 ```
+
+
 
 ### 7.3 Historical Sync Script
 
@@ -601,6 +623,8 @@ Add to `package.json`:
   }
 }
 ```
+
+
 
 ### 7.4 Data Retention Cleanup
 
@@ -623,6 +647,8 @@ describe('TrendAnalysisService', () => {
   it('calculates average daily volume', async () => {})
 })
 ```
+
+
 
 ### 7.6 Trend Analysis Service
 
@@ -647,6 +673,8 @@ class TrendAnalysisService {
 }
 ```
 
+
+
 ### 7.7 Tests First: Profit Scanner Service
 
 ```typescript
@@ -660,6 +688,8 @@ describe('ProfitOpportunityScannerService', () => {
   it('uses craft cost from CraftCalculatorService', async () => {})
 })
 ```
+
+
 
 ### 7.8 Profit Scanner Service
 
@@ -689,7 +719,7 @@ class ProfitOpportunityScannerService {
 
 **Profit Score Formula:**
 
-```
+```javascript
 netProfit = sellPrice × 0.85 - craftCost  // 15% TP tax
 profitScore = netProfit × sqrt(dailyVolume)
 ```
@@ -721,6 +751,8 @@ export const getItemPriceTrend = createServerFn({ method: 'GET' })
   });
 ```
 
+
+
 ### 7.10 Tests First: Frontend Components
 
 ```typescript
@@ -741,6 +773,8 @@ describe('PriceTrendChart', () => {
   it('displays current price and change', () => {})
 })
 ```
+
+
 
 ### 7.11 Frontend Components
 
@@ -767,27 +801,11 @@ Create `src/routes/opportunities.tsx`:
 - Filter controls for discipline, min volume, min margin
 - Auto-refresh every 5 minutes
 
-| Route | Component | Purpose |
-
-|-------|-----------|---------|
-
-| `/opportunities` | OpportunitiesPage | Profit opportunities dashboard |
+| Route | Component | Purpose ||-------|-----------|---------|| `/opportunities` | OpportunitiesPage | Profit opportunities dashboard |
 
 ### Storage Estimate
 
-| Metric | Value |
-
-|--------|-------|
-
-| Items tracked | ~27,000 |
-
-| Snapshots/day | 24 |
-
-| Rows/year | ~236 million |
-
-| Row size | ~50 bytes |
-
-| Total size | ~12 GB/year |
+| Metric | Value ||--------|-------|| Items tracked | ~27,000 || Snapshots/day | 24 || Rows/year | ~236 million || Row size | ~50 bytes || Total size | ~12 GB/year |
 
 ### Historical Data Flow
 
@@ -813,6 +831,7 @@ sequenceDiagram
     TrendSvc->>DB: Query price_history
     ProfitScan->>DB: Get craft costs
     ProfitScan-->>UI: Ranked profitable items
+
 
 
 

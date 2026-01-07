@@ -16,7 +16,10 @@
     "sync:items": "tsx scripts/sync-items.ts",
     "sync:recipes": "tsx scripts/sync-recipes.ts",
     "sync:prices": "tsx scripts/sync-prices.ts",
-    "sync:all": "tsx scripts/sync-all.ts"
+    "sync:history": "tsx scripts/sync-history.ts",
+    "sync:all": "tsx scripts/sync-all.ts",
+    "sync:all-with-history": "tsx scripts/sync-all.ts && tsx scripts/sync-history.ts",
+    "cleanup:history": "tsx scripts/cleanup-history.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.6",

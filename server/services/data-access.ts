@@ -24,13 +24,15 @@
  * ```
  */
 
-import { eq, like, sql } from "drizzle-orm";
+import { eq, like, sql, gte, desc } from "drizzle-orm";
 import type { Database } from "../db";
-import { items, recipes, prices } from "../db/schema";
-import type { Item, Recipe, Price } from "../db/schema";
+import { items, recipes, prices, priceHistory } from "../db/schema";
+import type { Item, Recipe, Price, PriceHistory } from "../db/schema";
 import type { DataAccess, QuantityAwareDataAccess } from "./craft-calculator.service";
 import type { GW2Listing } from "./gw2-api/types";
 import { GW2ApiClient } from "./gw2-api/client";
+import { TrendAnalysisService, type TrendDataAccess } from "./trend-analysis.service";
+import type { ProfitScannerDataAccess } from "./profit-scanner.service";
 
 /**
  * Creates a data access implementation for the given database.
@@ -239,6 +241,93 @@ export function createQuantityAwareDataAccess(
     async getListing(itemId: number): Promise<GW2Listing | null> {
       return client.getListing(itemId);
     },
+  };
+}
+
+/**
+ * Creates a trend data access implementation for trend analysis.
+ *
+ * @param db - Drizzle database instance
+ * @returns TrendDataAccess implementation
+ */
+export function createTrendDataAccess(db: Database): TrendDataAccess {
+  const baseAccess = createDataAccess(db);
+
+  return {
+    getPrice: baseAccess.getPrice,
+
+    /**
+     * Retrieves price history for an item from a given date.
+     *
+     * @param itemId - Item ID
+     * @param fromDate - Start date for history
+     * @returns Array of price history records
+     */
+    async getPriceHistory(itemId: number, fromDate: Date): Promise<PriceHistory[]> {
+      return db
+        .select()
+        .from(priceHistory)
+        .where(
+          sql`${priceHistory.itemId} = ${itemId} AND ${priceHistory.recordedAt} >= ${fromDate}`
+        )
+        .orderBy(priceHistory.recordedAt);
+    },
+  };
+}
+
+/**
+ * Creates a profit scanner data access implementation.
+ *
+ * @param db - Drizzle database instance
+ * @param trendAccess - Trend data access for volume data
+ * @param craftCalculator - Optional craft calculator for cost calculations
+ * @returns ProfitScannerDataAccess implementation
+ */
+export function createProfitScannerDataAccess(
+  db: Database,
+  getCraftCostFn: (itemId: number) => Promise<number | null>
+): ProfitScannerDataAccess {
+  const baseAccess = createDataAccess(db);
+  const trendAccess = createTrendDataAccess(db);
+  const trendService = new TrendAnalysisService(trendAccess);
+
+  return {
+    /**
+     * Retrieves all items that have crafting recipes.
+     */
+    async getAllCraftableItems(): Promise<Item[]> {
+      // Get unique item IDs that have recipes
+      const recipeOutputs = await db
+        .select({ outputItemId: recipes.outputItemId })
+        .from(recipes);
+
+      const uniqueItemIds = [...new Set(recipeOutputs.map((r) => r.outputItemId))];
+
+      if (uniqueItemIds.length === 0) {
+        return [];
+      }
+
+      // Fetch all those items
+      return db
+        .select()
+        .from(items)
+        .where(sql`${items.id} IN ${uniqueItemIds}`);
+    },
+
+    getRecipesByOutputItem: baseAccess.getRecipesByOutputItem,
+    getPrice: baseAccess.getPrice,
+
+    /**
+     * Retrieves price trend data for an item.
+     */
+    async getPriceTrend(itemId: number) {
+      return trendService.getPriceTrend(itemId, 7);
+    },
+
+    /**
+     * Retrieves the calculated craft cost for an item.
+     */
+    getCraftCost: getCraftCostFn,
   };
 }
 

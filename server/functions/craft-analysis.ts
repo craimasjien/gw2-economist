@@ -23,8 +23,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "../db";
-import { createExtendedDataAccess, createQuantityAwareDataAccess } from "../services/data-access";
+import {
+  createExtendedDataAccess,
+  createQuantityAwareDataAccess,
+  createTrendDataAccess,
+  createProfitScannerDataAccess,
+} from "../services/data-access";
 import { CraftCalculatorService, type QuantityAwareCraftAnalysis, type OptimalQuantityResult } from "../services/craft-calculator.service";
+import { TrendAnalysisService, type PriceTrend, type PriceDataPoint, type VolumeDataPoint } from "../services/trend-analysis.service";
+import { ProfitOpportunityScannerService, type ProfitableItem } from "../services/profit-scanner.service";
 import type { Item, Price } from "../db/schema";
 import {
   serializeItem,
@@ -370,5 +377,238 @@ export const findOptimalQuantity = createServerFn({ method: "GET" })
       baseBuyPrice: result.baseBuyPrice,
       baseCraftCost: result.baseCraftCost,
     };
+  });
+
+// ========================================
+// PROFIT OPPORTUNITY & TREND FUNCTIONS
+// ========================================
+
+/**
+ * Schema for profitable items input validation.
+ */
+const profitableItemsInputSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional().default(50),
+  minDailyVolume: z.number().int().min(0).optional().default(10),
+  minProfitMargin: z.number().min(0).max(1).optional().default(0.05),
+  disciplines: z.array(z.string()).optional(),
+});
+
+/**
+ * Schema for price trend input validation.
+ */
+const priceTrendInputSchema = z.object({
+  itemId: z.number().int().positive(),
+  days: z.number().int().min(1).max(365).optional().default(7),
+});
+
+/**
+ * Serialized profitable item for JSON transport.
+ *
+ * @interface SerializedProfitableItem
+ */
+export interface SerializedProfitableItem {
+  item: SerializedItem;
+  recipe: {
+    id: number;
+    type: string;
+    outputItemCount: number;
+    disciplines: string[];
+  };
+  craftCost: number;
+  sellPrice: number;
+  profit: number;
+  profitMargin: number;
+  dailyVolume: number;
+  profitScore: number;
+}
+
+/**
+ * Serialized price trend for JSON transport.
+ *
+ * @interface SerializedPriceTrend
+ */
+export interface SerializedPriceTrend {
+  itemId: number;
+  currentPrice: number;
+  priceChange24h: number;
+  priceChangePercent24h: number;
+  priceChange7d: number;
+  priceChangePercent7d: number;
+  avgDailyVolume: number;
+  volumeTrend: "increasing" | "stable" | "decreasing";
+}
+
+/**
+ * Serialized price data point for charting.
+ *
+ * @interface SerializedPriceDataPoint
+ */
+export interface SerializedPriceDataPoint {
+  timestamp: string;
+  buyPrice: number;
+  sellPrice: number;
+}
+
+/**
+ * Serialized volume data point for charting.
+ *
+ * @interface SerializedVolumeDataPoint
+ */
+export interface SerializedVolumeDataPoint {
+  timestamp: string;
+  buyQuantity: number;
+  sellQuantity: number;
+}
+
+/**
+ * Server function to get top profitable items for crafting.
+ *
+ * Scans all craftable items and returns those with positive profit margins,
+ * ranked by profit score (profit × sqrt(dailyVolume)).
+ *
+ * @param data.limit - Maximum results (default 50)
+ * @param data.minDailyVolume - Minimum daily volume filter (default 10)
+ * @param data.minProfitMargin - Minimum profit margin filter (default 0.05)
+ * @param data.disciplines - Filter by crafting disciplines
+ * @returns Array of profitable items sorted by profit score
+ *
+ * @example
+ * ```typescript
+ * const opportunities = await getProfitableItems({
+ *   data: { limit: 20, minDailyVolume: 50, disciplines: ["Tailor"] }
+ * });
+ * ```
+ */
+export const getProfitableItems = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => {
+    return profitableItemsInputSchema.parse(input);
+  })
+  .handler(async ({ data }): Promise<SerializedProfitableItem[]> => {
+    const dataAccess = createExtendedDataAccess(db);
+    const calculator = new CraftCalculatorService(dataAccess);
+
+    // Create a function to get craft cost for an item
+    const getCraftCost = async (itemId: number): Promise<number | null> => {
+      const analysis = await calculator.analyze(itemId);
+      return analysis?.craftCost ?? null;
+    };
+
+    const profitScannerAccess = createProfitScannerDataAccess(db, getCraftCost);
+    const scanner = new ProfitOpportunityScannerService(profitScannerAccess);
+
+    const results = await scanner.getTopProfitableItems({
+      limit: data.limit,
+      minDailyVolume: data.minDailyVolume,
+      minProfitMargin: data.minProfitMargin,
+      disciplines: data.disciplines,
+    });
+
+    return results.map((item) => ({
+      item: serializeItem(item.item),
+      recipe: {
+        id: item.recipe.id,
+        type: item.recipe.type,
+        outputItemCount: item.recipe.outputItemCount,
+        disciplines: item.recipe.disciplines,
+      },
+      craftCost: item.craftCost,
+      sellPrice: item.sellPrice,
+      profit: item.profit,
+      profitMargin: item.profitMargin,
+      dailyVolume: item.dailyVolume,
+      profitScore: item.profitScore,
+    }));
+  });
+
+/**
+ * Server function to get price trend data for an item.
+ *
+ * Returns price change data over 24h and 7d periods, along with
+ * volume trend information.
+ *
+ * @param data.itemId - Item ID to analyze
+ * @param data.days - Number of days of history to consider (default 7)
+ * @returns Price trend data or null if insufficient data
+ *
+ * @example
+ * ```typescript
+ * const trend = await getItemPriceTrend({ data: { itemId: 12345, days: 7 } });
+ * if (trend) {
+ *   console.log(`24h change: ${trend.priceChangePercent24h}%`);
+ * }
+ * ```
+ */
+export const getItemPriceTrend = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => {
+    return priceTrendInputSchema.parse(input);
+  })
+  .handler(async ({ data }): Promise<SerializedPriceTrend | null> => {
+    const trendAccess = createTrendDataAccess(db);
+    const trendService = new TrendAnalysisService(trendAccess);
+
+    const trend = await trendService.getPriceTrend(data.itemId, data.days);
+
+    if (!trend) {
+      return null;
+    }
+
+    return {
+      itemId: trend.itemId,
+      currentPrice: trend.currentPrice,
+      priceChange24h: trend.priceChange24h,
+      priceChangePercent24h: trend.priceChangePercent24h,
+      priceChange7d: trend.priceChange7d,
+      priceChangePercent7d: trend.priceChangePercent7d,
+      avgDailyVolume: trend.avgDailyVolume,
+      volumeTrend: trend.volumeTrend,
+    };
+  });
+
+/**
+ * Server function to get price history for charting.
+ *
+ * @param data.itemId - Item ID
+ * @param data.days - Number of days of history
+ * @returns Array of price data points
+ */
+export const getPriceHistory = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => {
+    return priceTrendInputSchema.parse(input);
+  })
+  .handler(async ({ data }): Promise<SerializedPriceDataPoint[]> => {
+    const trendAccess = createTrendDataAccess(db);
+    const trendService = new TrendAnalysisService(trendAccess);
+
+    const history = await trendService.getPriceHistory(data.itemId, data.days);
+
+    return history.map((point) => ({
+      timestamp: point.timestamp.toISOString(),
+      buyPrice: point.buyPrice,
+      sellPrice: point.sellPrice,
+    }));
+  });
+
+/**
+ * Server function to get volume history for charting.
+ *
+ * @param data.itemId - Item ID
+ * @param data.days - Number of days of history
+ * @returns Array of volume data points
+ */
+export const getVolumeHistory = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => {
+    return priceTrendInputSchema.parse(input);
+  })
+  .handler(async ({ data }): Promise<SerializedVolumeDataPoint[]> => {
+    const trendAccess = createTrendDataAccess(db);
+    const trendService = new TrendAnalysisService(trendAccess);
+
+    const history = await trendService.getVolumeHistory(data.itemId, data.days);
+
+    return history.map((point) => ({
+      timestamp: point.timestamp.toISOString(),
+      buyQuantity: point.buyQuantity,
+      sellQuantity: point.sellQuantity,
+    }));
   });
 

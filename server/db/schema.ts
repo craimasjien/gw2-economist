@@ -30,6 +30,7 @@ import {
   bigint,
   index,
   primaryKey,
+  serial,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -291,6 +292,76 @@ export const prices = pgTable("prices", {
 });
 
 /**
+ * Price history table storing hourly snapshots of trading post prices.
+ *
+ * @remarks
+ * Contains historical price data for trend analysis and profit discovery.
+ * Each row represents a snapshot of an item's price at a specific point in time.
+ * Data is retained for 1 year before cleanup.
+ *
+ * @see https://wiki.guildwars2.com/wiki/API:2/commerce/prices
+ */
+export const priceHistory = pgTable(
+  "price_history",
+  {
+    /**
+     * Auto-incrementing primary key.
+     */
+    id: serial("id").primaryKey(),
+
+    /**
+     * GW2 item ID.
+     * References the items table.
+     */
+    itemId: integer("item_id").notNull(),
+
+    /**
+     * Highest buy order price in copper at snapshot time.
+     */
+    buyPrice: integer("buy_price").notNull(),
+
+    /**
+     * Number of buy orders at the snapshot time.
+     */
+    buyQuantity: integer("buy_quantity").notNull(),
+
+    /**
+     * Lowest sell listing price in copper at snapshot time.
+     */
+    sellPrice: integer("sell_price").notNull(),
+
+    /**
+     * Number of sell listings at the snapshot time.
+     */
+    sellQuantity: integer("sell_quantity").notNull(),
+
+    /**
+     * Timestamp when this price snapshot was recorded.
+     */
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    /**
+     * Index for looking up history by item ID.
+     */
+    index("price_history_item_id_idx").on(table.itemId),
+
+    /**
+     * Index for time-based queries and cleanup.
+     */
+    index("price_history_recorded_at_idx").on(table.recordedAt),
+
+    /**
+     * Composite index for efficient item + time range queries.
+     * Critical for trend analysis queries.
+     */
+    index("price_history_item_time_idx").on(table.itemId, table.recordedAt),
+  ]
+);
+
+/**
  * TypeScript type for inserting a new item record.
  */
 export type NewItem = typeof items.$inferInsert;
@@ -319,4 +390,14 @@ export type NewPrice = typeof prices.$inferInsert;
  * TypeScript type for a selected price record.
  */
 export type Price = typeof prices.$inferSelect;
+
+/**
+ * TypeScript type for inserting a new price history record.
+ */
+export type NewPriceHistory = typeof priceHistory.$inferInsert;
+
+/**
+ * TypeScript type for a selected price history record.
+ */
+export type PriceHistory = typeof priceHistory.$inferSelect;
 

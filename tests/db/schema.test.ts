@@ -14,6 +14,7 @@ import {
   items,
   recipes,
   prices,
+  priceHistory,
   type RecipeIngredient,
   type GuildUpgradeIngredient,
 } from "../../server/db/schema";
@@ -164,6 +165,49 @@ describe("Database Schema", () => {
 
       expect(guildIngredient.upgradeId).toBe(999);
       expect(guildIngredient.count).toBe(1);
+    });
+  });
+
+  describe("priceHistory table", () => {
+    it("should be named 'price_history'", () => {
+      expect(getTableName(priceHistory)).toBe("price_history");
+    });
+
+    it("should have all required columns for price tracking", () => {
+      const columns = getTableColumns(priceHistory);
+      const columnNames = Object.keys(columns);
+
+      expect(columnNames).toContain("id");
+      expect(columnNames).toContain("itemId");
+      expect(columnNames).toContain("buyPrice");
+      expect(columnNames).toContain("buyQuantity");
+      expect(columnNames).toContain("sellPrice");
+      expect(columnNames).toContain("sellQuantity");
+      expect(columnNames).toContain("recordedAt");
+    });
+
+    it("should have id as primary key", () => {
+      const columns = getTableColumns(priceHistory);
+      expect(columns.id.primary).toBe(true);
+    });
+
+    it("should have itemId as not null", () => {
+      const columns = getTableColumns(priceHistory);
+      expect(columns.itemId.notNull).toBe(true);
+    });
+
+    it("should have all price fields as not null", () => {
+      const columns = getTableColumns(priceHistory);
+      expect(columns.buyPrice.notNull).toBe(true);
+      expect(columns.buyQuantity.notNull).toBe(true);
+      expect(columns.sellPrice.notNull).toBe(true);
+      expect(columns.sellQuantity.notNull).toBe(true);
+    });
+
+    it("should have recordedAt as not null with timestamp type", () => {
+      const columns = getTableColumns(priceHistory);
+      expect(columns.recordedAt.notNull).toBe(true);
+      expect(columns.recordedAt.dataType).toBe("date");
     });
   });
 });
