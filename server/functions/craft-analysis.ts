@@ -22,16 +22,15 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { db } from "../db";
+import { desc, gte, sql } from "drizzle-orm";
+import { db, profitOpportunities } from "../db";
 import {
   createExtendedDataAccess,
   createQuantityAwareDataAccess,
   createTrendDataAccess,
-  createProfitScannerDataAccess,
 } from "../services/data-access";
 import { CraftCalculatorService, type QuantityAwareCraftAnalysis, type OptimalQuantityResult } from "../services/craft-calculator.service";
-import { TrendAnalysisService, type PriceTrend, type PriceDataPoint, type VolumeDataPoint } from "../services/trend-analysis.service";
-import { ProfitOpportunityScannerService, type ProfitableItem } from "../services/profit-scanner.service";
+import { TrendAnalysisService, type PriceDataPoint, type VolumeDataPoint } from "../services/trend-analysis.service";
 import type { Item, Price } from "../db/schema";
 import {
   serializeItem,
@@ -485,43 +484,62 @@ export const getProfitableItems = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<SerializedProfitableItem[]> => {
     try {
-      const dataAccess = createExtendedDataAccess(db);
-      const calculator = new CraftCalculatorService(dataAccess);
+      // Read from pre-calculated profit_opportunities table (instant!)
+      let query = db
+        .select()
+        .from(profitOpportunities)
+        .orderBy(desc(profitOpportunities.profitScore))
+        .limit(data.limit);
 
-      // Create a function to get craft cost for an item
-      const getCraftCost = async (itemId: number): Promise<number | null> => {
-        try {
-          const analysis = await calculator.analyze(itemId);
-          return analysis?.craftCost ?? null;
-        } catch {
-          return null;
-        }
-      };
+      const results = await query;
 
-      const profitScannerAccess = createProfitScannerDataAccess(db, getCraftCost);
-      const scanner = new ProfitOpportunityScannerService(profitScannerAccess);
+      // Apply filters in memory (table is already limited to 500 rows max)
+      let filtered = results;
 
-      const results = await scanner.getTopProfitableItems({
-        limit: data.limit,
-        minDailyVolume: data.minDailyVolume,
-        minProfitMargin: data.minProfitMargin,
-        disciplines: data.disciplines,
-      });
+      // Filter by minimum daily volume
+      if (data.minDailyVolume > 0) {
+        filtered = filtered.filter((r) => r.dailyVolume >= data.minDailyVolume);
+      }
 
-      return results.map((item) => ({
-        item: serializeItem(item.item),
-        recipe: {
-          id: item.recipe.id,
-          type: item.recipe.type,
-          outputItemCount: item.recipe.outputItemCount,
-          disciplines: item.recipe.disciplines,
+      // Filter by minimum profit margin (convert from basis points)
+      if (data.minProfitMargin > 0) {
+        const minMarginBps = data.minProfitMargin * 10000;
+        filtered = filtered.filter((r) => r.profitMarginBps >= minMarginBps);
+      }
+
+      // Filter by disciplines
+      if (data.disciplines && data.disciplines.length > 0) {
+        filtered = filtered.filter((r) =>
+          r.disciplines.some((d) => data.disciplines!.includes(d))
+        );
+      }
+
+      return filtered.map((opp) => ({
+        item: {
+          id: opp.itemId,
+          name: opp.itemName,
+          description: null,
+          type: "Unknown",
+          rarity: opp.itemRarity,
+          level: 0,
+          icon: opp.itemIcon,
+          vendorValue: 0,
+          chatLink: null,
+          flags: [],
+          updatedAt: opp.calculatedAt.toISOString(),
         },
-        craftCost: item.craftCost,
-        sellPrice: item.sellPrice,
-        profit: item.profit,
-        profitMargin: item.profitMargin,
-        dailyVolume: item.dailyVolume,
-        profitScore: item.profitScore,
+        recipe: {
+          id: opp.recipeId,
+          type: "Unknown",
+          outputItemCount: 1,
+          disciplines: opp.disciplines,
+        },
+        craftCost: opp.craftCost,
+        sellPrice: opp.sellPrice,
+        profit: opp.profit,
+        profitMargin: opp.profitMarginBps / 10000, // Convert back from basis points
+        dailyVolume: opp.dailyVolume,
+        profitScore: opp.profitScore,
       }));
     } catch (err) {
       console.error("Error in getProfitableItems:", err);

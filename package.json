@@ -17,9 +17,10 @@
     "sync:recipes": "tsx scripts/sync-recipes.ts",
     "sync:prices": "tsx scripts/sync-prices.ts",
     "sync:history": "tsx scripts/sync-history.ts",
-    "sync:prices-with-history": "tsx scripts/sync-prices.ts && tsx scripts/sync-history.ts",
+    "calculate:profits": "tsx scripts/calculate-profits.ts",
+    "sync:prices-with-history": "tsx scripts/sync-prices.ts && tsx scripts/sync-history.ts && tsx scripts/calculate-profits.ts",
     "sync:all": "tsx scripts/sync-all.ts",
-    "sync:all-with-history": "tsx scripts/sync-all.ts && tsx scripts/sync-history.ts",
+    "sync:all-with-history": "tsx scripts/sync-all.ts && tsx scripts/sync-history.ts && tsx scripts/calculate-profits.ts",
     "cleanup:history": "tsx scripts/cleanup-history.ts"
   },
   "dependencies": {

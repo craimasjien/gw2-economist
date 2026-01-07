@@ -15,6 +15,7 @@ import {
   recipes,
   prices,
   priceHistory,
+  profitOpportunities,
   type RecipeIngredient,
   type GuildUpgradeIngredient,
 } from "../../server/db/schema";
@@ -208,6 +209,48 @@ describe("Database Schema", () => {
       const columns = getTableColumns(priceHistory);
       expect(columns.recordedAt.notNull).toBe(true);
       expect(columns.recordedAt.dataType).toBe("date");
+    });
+  });
+
+  describe("profit_opportunities table", () => {
+    it("should be named 'profit_opportunities'", () => {
+      expect(getTableName(profitOpportunities)).toBe("profit_opportunities");
+    });
+
+    it("should have all required columns for profit tracking", () => {
+      const columns = getTableColumns(profitOpportunities);
+      const columnNames = Object.keys(columns);
+
+      expect(columnNames).toContain("id");
+      expect(columnNames).toContain("itemId");
+      expect(columnNames).toContain("recipeId");
+      expect(columnNames).toContain("itemName");
+      expect(columnNames).toContain("itemIcon");
+      expect(columnNames).toContain("itemRarity");
+      expect(columnNames).toContain("disciplines");
+      expect(columnNames).toContain("craftCost");
+      expect(columnNames).toContain("sellPrice");
+      expect(columnNames).toContain("profit");
+      expect(columnNames).toContain("profitMargin");
+      expect(columnNames).toContain("dailyVolume");
+      expect(columnNames).toContain("profitScore");
+      expect(columnNames).toContain("calculatedAt");
+    });
+
+    it("should have id as primary key", () => {
+      const columns = getTableColumns(profitOpportunities);
+      expect(columns.id.primary).toBe(true);
+    });
+
+    it("should have all required fields as not null", () => {
+      const columns = getTableColumns(profitOpportunities);
+      expect(columns.itemId.notNull).toBe(true);
+      expect(columns.recipeId.notNull).toBe(true);
+      expect(columns.itemName.notNull).toBe(true);
+      expect(columns.craftCost.notNull).toBe(true);
+      expect(columns.sellPrice.notNull).toBe(true);
+      expect(columns.profit.notNull).toBe(true);
+      expect(columns.profitScore.notNull).toBe(true);
     });
   });
 });

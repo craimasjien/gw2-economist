@@ -401,3 +401,109 @@ export type NewPriceHistory = typeof priceHistory.$inferInsert;
  */
 export type PriceHistory = typeof priceHistory.$inferSelect;
 
+/**
+ * Pre-calculated profit opportunities table.
+ *
+ * @remarks
+ * This table stores the results of the profit scanner, calculated during sync.
+ * Reading from this table is instant, avoiding expensive on-demand calculations.
+ * The table is completely replaced on each sync (truncate + insert).
+ */
+export const profitOpportunities = pgTable(
+  "profit_opportunities",
+  {
+    /**
+     * Auto-incrementing primary key.
+     */
+    id: serial("id").primaryKey(),
+
+    /**
+     * GW2 item ID that can be crafted for profit.
+     */
+    itemId: integer("item_id").notNull(),
+
+    /**
+     * Recipe ID used for crafting.
+     */
+    recipeId: integer("recipe_id").notNull(),
+
+    /**
+     * Item name (denormalized for fast reads).
+     */
+    itemName: text("item_name").notNull(),
+
+    /**
+     * Item icon URL (denormalized for fast reads).
+     */
+    itemIcon: text("item_icon"),
+
+    /**
+     * Item rarity (denormalized for fast reads).
+     */
+    itemRarity: varchar("item_rarity", { length: 20 }).notNull(),
+
+    /**
+     * Crafting disciplines that can make this item.
+     */
+    disciplines: jsonb("disciplines").$type<string[]>().notNull().default([]),
+
+    /**
+     * Total cost to craft the item in copper.
+     */
+    craftCost: integer("craft_cost").notNull(),
+
+    /**
+     * Current sell price on trading post in copper.
+     */
+    sellPrice: integer("sell_price").notNull(),
+
+    /**
+     * Net profit after 15% TP tax in copper.
+     */
+    profit: integer("profit").notNull(),
+
+    /**
+     * Profit margin as a decimal (0-1).
+     */
+    profitMargin: integer("profit_margin_bps").notNull(), // Basis points (0.05 = 500)
+
+    /**
+     * Estimated daily trading volume.
+     */
+    dailyVolume: integer("daily_volume").notNull(),
+
+    /**
+     * Profit score for ranking (profit × sqrt(volume)).
+     */
+    profitScore: integer("profit_score").notNull(),
+
+    /**
+     * Timestamp when this opportunity was calculated.
+     */
+    calculatedAt: timestamp("calculated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    /**
+     * Index for sorting by profit score.
+     */
+    index("profit_opportunities_score_idx").on(table.profitScore),
+
+    /**
+     * Index for filtering by discipline.
+     */
+    index("profit_opportunities_item_idx").on(table.itemId),
+  ]
+);
+
+/**
+ * TypeScript type for inserting a new profit opportunity record.
+ */
+export type NewProfitOpportunity = typeof profitOpportunities.$inferInsert;
+
+/**
+ * TypeScript type for a selected profit opportunity record.
+ */
+export type ProfitOpportunity = typeof profitOpportunities.$inferSelect;
+
