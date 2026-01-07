@@ -1,9 +1,9 @@
 /**
  * Global Styles for GW2 Economist Application
  *
- * This stylesheet imports Tailwind CSS and defines global base styles
- * for the application. It sets up the default font stack for body text
- * and monospace fonts for code elements.
+ * This stylesheet defines the Guild Wars 2 themed design system.
+ * It uses the official GW2 EasonPro font and a color palette inspired
+ * by the GW2 website: dark backgrounds with red/gold accents.
  *
  * Usage: This file is imported in the root route (__root.tsx) and
  * applies to all pages in the application.
@@ -11,16 +11,314 @@
 
 @import "tailwindcss";
 
+/* ========================================
+   GW2 Official Font - EasonPro
+   ======================================== */
+@font-face {
+  font-family: 'EasonPro';
+  src: url('https://d1h9a8s8eodvjz.cloudfront.net/fonts/eason/v1/easonpro-regular-webfont.woff2') format('woff2'),
+       url('https://d1h9a8s8eodvjz.cloudfront.net/fonts/eason/v1/easonpro-regular-webfont.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'EasonPro';
+  src: url('https://d1h9a8s8eodvjz.cloudfront.net/fonts/eason/v1/easonpro-bold-webfont.woff2') format('woff2'),
+       url('https://d1h9a8s8eodvjz.cloudfront.net/fonts/eason/v1/easonpro-bold-webfont.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ========================================
+   GW2 Design System CSS Variables
+   ======================================== */
+:root {
+  /* Primary Colors - GW2 Red Theme */
+  --gw2-red: #c41f3b;
+  --gw2-red-dark: #8b1528;
+  --gw2-red-light: #e63950;
+  --gw2-red-glow: rgba(196, 31, 59, 0.4);
+
+  /* Gold / Accent Colors */
+  --gw2-gold: #d4af37;
+  --gw2-gold-light: #f0d060;
+  --gw2-gold-dark: #996515;
+  --gw2-gold-glow: rgba(212, 175, 55, 0.3);
+
+  /* Background Colors - Dark Fantasy */
+  --gw2-bg-darkest: #0a0908;
+  --gw2-bg-dark: #151210;
+  --gw2-bg-medium: #1e1a17;
+  --gw2-bg-light: #2a2420;
+  --gw2-bg-card: rgba(30, 26, 23, 0.85);
+  --gw2-bg-card-hover: rgba(42, 36, 32, 0.95);
+
+  /* Border Colors */
+  --gw2-border: rgba(212, 175, 55, 0.2);
+  --gw2-border-light: rgba(212, 175, 55, 0.35);
+  --gw2-border-active: var(--gw2-gold);
+
+  /* Text Colors */
+  --gw2-text-primary: #f4e4c9;
+  --gw2-text-secondary: #b8a88a;
+  --gw2-text-muted: #7a6f5f;
+  --gw2-text-highlight: var(--gw2-gold);
+
+  /* Rarity Colors (GW2 official colors) */
+  --rarity-junk: #aaaaaa;
+  --rarity-basic: #ffffff;
+  --rarity-fine: #62a4da;
+  --rarity-masterwork: #1a9306;
+  --rarity-rare: #fcd00b;
+  --rarity-exotic: #ffa405;
+  --rarity-ascended: #fb3e8d;
+  --rarity-legendary: #4c139d;
+
+  /* UI Colors */
+  --gw2-success: #1a9306;
+  --gw2-warning: #ffa405;
+  --gw2-error: #c41f3b;
+  --gw2-info: #62a4da;
+
+  /* Shadows */
+  --gw2-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --gw2-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --gw2-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --gw2-shadow-glow: 0 0 20px var(--gw2-gold-glow);
+  --gw2-shadow-red-glow: 0 0 30px var(--gw2-red-glow);
+
+  /* Fonts */
+  --font-display: 'EasonPro', Georgia, 'Times New Roman', serif;
+  --font-body: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* ========================================
+   Base Styles
+   ======================================== */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   @apply m-0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
+  font-family: var(--font-body);
+  background-color: var(--gw2-bg-darkest);
+  color: var(--gw2-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+/* ========================================
+   Typography
+   ======================================== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--gw2-text-primary);
+  letter-spacing: 0.02em;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
+  font-family: var(--font-mono);
+}
+
+/* ========================================
+   GW2 Themed Components (Tailwind @apply)
+   ======================================== */
+
+/* Gold-bordered card style */
+.gw2-card {
+  @apply rounded-lg;
+  background: var(--gw2-bg-card);
+  border: 1px solid var(--gw2-border);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--gw2-shadow-md);
+}
+
+.gw2-card:hover {
+  border-color: var(--gw2-border-light);
+  box-shadow: var(--gw2-shadow-lg);
+}
+
+/* Input styling */
+.gw2-input {
+  @apply px-4 py-3 rounded-lg outline-none transition-all duration-200;
+  background: var(--gw2-bg-dark);
+  border: 1px solid var(--gw2-border);
+  color: var(--gw2-text-primary);
+}
+
+.gw2-input:focus {
+  border-color: var(--gw2-gold);
+  box-shadow: 0 0 0 2px var(--gw2-gold-glow);
+}
+
+.gw2-input::placeholder {
+  color: var(--gw2-text-muted);
+}
+
+/* Primary button */
+.gw2-button {
+  @apply px-6 py-3 font-semibold rounded-lg transition-all duration-200;
+  font-family: var(--font-display);
+  background: linear-gradient(180deg, var(--gw2-red) 0%, var(--gw2-red-dark) 100%);
+  border: 1px solid var(--gw2-red);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.gw2-button:hover {
+  background: linear-gradient(180deg, var(--gw2-red-light) 0%, var(--gw2-red) 100%);
+  box-shadow: var(--gw2-shadow-red-glow);
+  transform: translateY(-1px);
+}
+
+.gw2-button:active {
+  transform: translateY(0);
+}
+
+/* Secondary/Gold button */
+.gw2-button-gold {
+  @apply px-6 py-3 font-semibold rounded-lg transition-all duration-200;
+  font-family: var(--font-display);
+  background: linear-gradient(180deg, var(--gw2-gold) 0%, var(--gw2-gold-dark) 100%);
+  border: 1px solid var(--gw2-gold);
+  color: var(--gw2-bg-darkest);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.gw2-button-gold:hover {
+  background: linear-gradient(180deg, var(--gw2-gold-light) 0%, var(--gw2-gold) 100%);
+  box-shadow: var(--gw2-shadow-glow);
+}
+
+/* ========================================
+   Decorative Elements
+   ======================================== */
+
+/* Ornate divider */
+.gw2-divider {
+  @apply relative my-8 h-px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--gw2-border) 20%,
+    var(--gw2-gold) 50%,
+    var(--gw2-border) 80%,
+    transparent 100%
+  );
+}
+
+.gw2-divider::before {
+  content: '◆';
+  @apply absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2;
+  color: var(--gw2-gold);
+  background: var(--gw2-bg-darkest);
+  padding: 0 0.5rem;
+}
+
+/* Glowing text effect */
+.gw2-text-glow {
+  text-shadow: 0 0 10px var(--gw2-gold-glow), 0 0 20px var(--gw2-gold-glow);
+}
+
+/* ========================================
+   Background Patterns
+   ======================================== */
+.gw2-bg-pattern {
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(196, 31, 59, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 50%, rgba(212, 175, 55, 0.08) 0%, transparent 40%),
+    radial-gradient(ellipse at 100% 50%, rgba(212, 175, 55, 0.08) 0%, transparent 40%),
+    linear-gradient(180deg, var(--gw2-bg-darkest) 0%, var(--gw2-bg-dark) 50%, var(--gw2-bg-darkest) 100%);
+}
+
+/* Subtle noise texture overlay */
+.gw2-texture::before {
+  content: '';
+  @apply absolute inset-0 pointer-events-none opacity-30;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gw2-bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gw2-bg-light);
+  border-radius: 5px;
+  border: 2px solid var(--gw2-bg-dark);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gw2-text-muted);
+}
+
+/* ========================================
+   Selection Styling
+   ======================================== */
+::selection {
+  background: var(--gw2-red);
+  color: white;
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+@keyframes gw2-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes gw2-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--gw2-gold-glow);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--gw2-gold-glow), 0 0 30px var(--gw2-gold-glow);
+  }
+}
+
+@keyframes gw2-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-gw2-pulse {
+  animation: gw2-pulse 2s ease-in-out infinite;
+}
+
+.animate-gw2-glow {
+  animation: gw2-glow 2s ease-in-out infinite;
+}
+
+.animate-gw2-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--gw2-gold-glow) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: gw2-shimmer 3s linear infinite;
 }

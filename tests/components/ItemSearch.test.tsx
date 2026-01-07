@@ -357,9 +357,9 @@ describe("ItemSearch", () => {
 
       fireEvent.keyDown(input, { key: "ArrowDown" });
 
-      // First item should be highlighted
+      // First item should be highlighted (using inline styles with CSS variables)
       const firstResult = screen.getByTestId("search-result-12345");
-      expect(firstResult).toHaveClass("bg-slate-700");
+      expect(firstResult).toHaveStyle({ background: "var(--gw2-bg-light)" });
     });
 
     it("should navigate up with ArrowUp", async () => {
@@ -380,18 +380,18 @@ describe("ItemSearch", () => {
       fireEvent.keyDown(input, { key: "ArrowDown" });
       fireEvent.keyDown(input, { key: "ArrowDown" });
 
-      // Second item should be highlighted
-      expect(screen.getByTestId("search-result-12346")).toHaveClass(
-        "bg-slate-700"
-      );
+      // Second item should be highlighted (using inline styles with CSS variables)
+      expect(screen.getByTestId("search-result-12346")).toHaveStyle({
+        background: "var(--gw2-bg-light)",
+      });
 
       // Navigate up
       fireEvent.keyDown(input, { key: "ArrowUp" });
 
       // First item should be highlighted again
-      expect(screen.getByTestId("search-result-12345")).toHaveClass(
-        "bg-slate-700"
-      );
+      expect(screen.getByTestId("search-result-12345")).toHaveStyle({
+        background: "var(--gw2-bg-light)",
+      });
     });
 
     it("should select item with Enter", async () => {

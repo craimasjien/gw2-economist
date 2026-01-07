@@ -3,7 +3,7 @@
  *
  * Shows buy vs craft recommendation with visual highlighting, price comparison,
  * savings calculation, and material breakdown tree. Supports nested materials
- * for recursive recipe analysis.
+ * for recursive recipe analysis. Styled with GW2 theme.
  *
  * @module components/CraftAnalysis
  *
@@ -20,6 +20,7 @@ import type {
   SerializedCraftAnalysis,
   SerializedMaterialBreakdown,
 } from "../../server/functions/craft-analysis";
+import { ShoppingCart, Hammer, TrendingUp, ChevronRight } from "lucide-react";
 
 /**
  * Props for the CraftAnalysis component.
@@ -37,17 +38,17 @@ export interface CraftAnalysisProps {
 }
 
 /**
- * Rarity color mapping for item borders and text.
+ * Rarity color mapping using GW2 official colors.
  */
-const rarityColors: Record<string, string> = {
-  Junk: "border-gray-500 text-gray-400",
-  Basic: "border-gray-400 text-gray-300",
-  Fine: "border-blue-400 text-blue-400",
-  Masterwork: "border-green-400 text-green-400",
-  Rare: "border-yellow-400 text-yellow-400",
-  Exotic: "border-orange-400 text-orange-400",
-  Ascended: "border-pink-400 text-pink-400",
-  Legendary: "border-purple-400 text-purple-400",
+const rarityColors: Record<string, { border: string; text: string }> = {
+  Junk: { border: "var(--rarity-junk)", text: "var(--rarity-junk)" },
+  Basic: { border: "var(--rarity-basic)", text: "var(--rarity-basic)" },
+  Fine: { border: "var(--rarity-fine)", text: "var(--rarity-fine)" },
+  Masterwork: { border: "var(--rarity-masterwork)", text: "var(--rarity-masterwork)" },
+  Rare: { border: "var(--rarity-rare)", text: "var(--rarity-rare)" },
+  Exotic: { border: "var(--rarity-exotic)", text: "var(--rarity-exotic)" },
+  Ascended: { border: "var(--rarity-ascended)", text: "var(--rarity-ascended)" },
+  Legendary: { border: "var(--rarity-legendary)", text: "var(--rarity-legendary)" },
 };
 
 /**
@@ -59,28 +60,36 @@ const rarityColors: Record<string, string> = {
 export function CraftAnalysis({ analysis, className = "" }: CraftAnalysisProps) {
   const isBuy = analysis.recommendation === "buy";
   const hasNoBuyOption = analysis.buyPrice === 0;
+  const rarity = rarityColors[analysis.item.rarity] || { border: "var(--gw2-border)", text: "var(--gw2-text-secondary)" };
 
   return (
     <div
-      className={`bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden ${className}`}
+      className={`gw2-card overflow-hidden ${className}`}
     >
       {/* Item Header */}
-      <div className="p-6 border-b border-slate-700">
+      <div
+        className="p-6"
+        style={{ borderBottom: '1px solid var(--gw2-border)' }}
+      >
         <div className="flex items-start gap-4">
           {analysis.item.icon && (
             <img
               src={analysis.item.icon}
               alt={analysis.item.name}
-              className={`w-16 h-16 rounded-lg border-2 ${
-                rarityColors[analysis.item.rarity] || "border-gray-500"
-              }`}
+              className="w-16 h-16 rounded-lg"
+              style={{
+                border: `2px solid ${rarity.border}`,
+                boxShadow: `0 0 12px ${rarity.border}40`,
+              }}
             />
           )}
           <div className="flex-1">
             <h2
-              className={`text-2xl font-bold ${
-                rarityColors[analysis.item.rarity]?.split(" ")[1] || "text-white"
-              }`}
+              className="text-2xl font-bold"
+              style={{
+                fontFamily: 'var(--font-display)',
+                color: rarity.text,
+              }}
             >
               {analysis.item.name}
             </h2>
@@ -88,7 +97,12 @@ export function CraftAnalysis({ analysis, className = "" }: CraftAnalysisProps) 
               {analysis.recipe.disciplines.map((disc) => (
                 <span
                   key={disc}
-                  className="px-2 py-0.5 bg-slate-700 rounded text-xs text-gray-300"
+                  className="px-2 py-0.5 rounded text-xs"
+                  style={{
+                    background: 'var(--gw2-bg-light)',
+                    color: 'var(--gw2-text-secondary)',
+                    border: '1px solid var(--gw2-border)',
+                  }}
                 >
                   {disc}
                 </span>
@@ -101,36 +115,62 @@ export function CraftAnalysis({ analysis, className = "" }: CraftAnalysisProps) 
       {/* Recommendation Banner */}
       <div
         data-testid="recommendation"
-        className={`px-6 py-4 ${
-          isBuy
-            ? "bg-emerald-600/20 border-b border-emerald-500/30"
-            : "bg-indigo-600/20 border-b border-indigo-500/30"
-        }`}
+        className="px-6 py-4"
+        style={{
+          background: isBuy
+            ? 'linear-gradient(90deg, rgba(26, 147, 6, 0.15) 0%, transparent 100%)'
+            : 'linear-gradient(90deg, rgba(196, 31, 59, 0.15) 0%, transparent 100%)',
+          borderBottom: '1px solid var(--gw2-border)',
+          borderLeft: `4px solid ${isBuy ? 'var(--gw2-success)' : 'var(--gw2-red)'}`,
+        }}
       >
         <div className="flex items-center justify-between">
-          <div>
-            <span className="text-lg font-semibold text-white">
-              Recommendation:{" "}
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2 rounded-lg"
+              style={{
+                background: isBuy ? 'rgba(26, 147, 6, 0.2)' : 'rgba(196, 31, 59, 0.2)',
+              }}
+            >
+              {isBuy ? (
+                <ShoppingCart className="w-6 h-6" style={{ color: 'var(--gw2-success)' }} />
+              ) : (
+                <Hammer className="w-6 h-6" style={{ color: 'var(--gw2-red-light)' }} />
+              )}
+            </div>
+            <div>
               <span
-                className={`uppercase font-bold ${
-                  isBuy ? "text-emerald-400" : "text-indigo-400"
-                }`}
+                className="text-lg font-semibold"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  color: 'var(--gw2-text-primary)',
+                }}
               >
-                {hasNoBuyOption ? "Craft (Not Tradeable)" : analysis.recommendation}
+                Recommendation:{" "}
+                <span
+                  className="uppercase font-bold"
+                  style={{ color: isBuy ? 'var(--gw2-success)' : 'var(--gw2-red-light)' }}
+                >
+                  {hasNoBuyOption ? "Craft (Not Tradeable)" : analysis.recommendation}
+                </span>
               </span>
-            </span>
-            {hasNoBuyOption && (
-              <p className="text-sm text-gray-400 mt-1">
-                This item is not tradeable or account bound - craft only
-              </p>
-            )}
+              {hasNoBuyOption && (
+                <p className="text-sm mt-1" style={{ color: 'var(--gw2-text-muted)' }}>
+                  This item is not tradeable or account bound - craft only
+                </p>
+              )}
+            </div>
           </div>
           <div data-testid="savings" className="text-right">
-            <span className="text-sm text-gray-400">You save</span>
+            <span className="text-sm" style={{ color: 'var(--gw2-text-muted)' }}>You save</span>
             <div className="flex items-center gap-2">
               <PriceDisplay copper={analysis.savings} size="lg" />
-              <span className="text-emerald-400 font-semibold">
-                ({analysis.savingsPercent.toFixed(1)}%)
+              <span
+                className="font-semibold flex items-center gap-1"
+                style={{ color: 'var(--gw2-success)' }}
+              >
+                <TrendingUp className="w-4 h-4" />
+                {analysis.savingsPercent.toFixed(1)}%
               </span>
             </div>
           </div>
@@ -138,42 +178,59 @@ export function CraftAnalysis({ analysis, className = "" }: CraftAnalysisProps) 
       </div>
 
       {/* Price Comparison */}
-      <div className="grid grid-cols-2 gap-4 p-6 border-b border-slate-700">
+      <div
+        className="grid grid-cols-2 gap-4 p-6"
+        style={{ borderBottom: '1px solid var(--gw2-border)' }}
+      >
         <div
           data-testid="buy-price"
-          className={`p-4 rounded-lg ${
-            isBuy
-              ? "bg-emerald-600/10 border border-emerald-500/30"
-              : "bg-slate-700/50"
-          }`}
+          className="p-4 rounded-lg transition-all duration-200"
+          style={{
+            background: isBuy ? 'rgba(26, 147, 6, 0.1)' : 'var(--gw2-bg-light)',
+            border: isBuy ? '1px solid var(--gw2-success)' : '1px solid var(--gw2-border)',
+            boxShadow: isBuy ? '0 0 15px rgba(26, 147, 6, 0.2)' : 'none',
+          }}
         >
-          <div className="text-sm text-gray-400 mb-1">Buy Price</div>
+          <div className="flex items-center gap-2 mb-2">
+            <ShoppingCart className="w-4 h-4" style={{ color: 'var(--gw2-text-muted)' }} />
+            <span className="text-sm" style={{ color: 'var(--gw2-text-muted)' }}>Buy Price</span>
+          </div>
           {analysis.buyPrice > 0 ? (
             <PriceDisplay copper={analysis.buyPrice} size="lg" />
           ) : (
-            <span className="text-gray-500 italic">Not available</span>
+            <span className="italic" style={{ color: 'var(--gw2-text-muted)' }}>Not available</span>
           )}
         </div>
 
         <div
           data-testid="craft-cost"
-          className={`p-4 rounded-lg ${
-            !isBuy
-              ? "bg-indigo-600/10 border border-indigo-500/30"
-              : "bg-slate-700/50"
-          }`}
+          className="p-4 rounded-lg transition-all duration-200"
+          style={{
+            background: !isBuy ? 'rgba(196, 31, 59, 0.1)' : 'var(--gw2-bg-light)',
+            border: !isBuy ? '1px solid var(--gw2-red)' : '1px solid var(--gw2-border)',
+            boxShadow: !isBuy ? '0 0 15px var(--gw2-red-glow)' : 'none',
+          }}
         >
-          <div className="text-sm text-gray-400 mb-1">Craft Cost</div>
+          <div className="flex items-center gap-2 mb-2">
+            <Hammer className="w-4 h-4" style={{ color: 'var(--gw2-text-muted)' }} />
+            <span className="text-sm" style={{ color: 'var(--gw2-text-muted)' }}>Craft Cost</span>
+          </div>
           <PriceDisplay copper={Math.round(analysis.craftCost)} size="lg" />
         </div>
       </div>
 
       {/* Materials Section */}
       <div className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">
+        <h3
+          className="text-lg font-semibold mb-4"
+          style={{
+            fontFamily: 'var(--font-display)',
+            color: 'var(--gw2-text-primary)',
+          }}
+        >
           Materials Required
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {analysis.materials.map((material) => (
             <MaterialRow key={material.item.id} material={material} depth={0} />
           ))}
@@ -197,38 +254,62 @@ interface MaterialRowProps {
 function MaterialRow({ material, depth }: MaterialRowProps) {
   const indent = depth * 24;
   const isCrafted = !material.usedBuyPrice && material.craftAnalysis;
+  const rarity = rarityColors[material.item.rarity] || { border: "var(--gw2-border)", text: "var(--gw2-text-secondary)" };
 
   return (
     <>
       <div
-        className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
-        style={{ marginLeft: indent }}
+        className="flex items-center gap-3 p-2 rounded-lg transition-all duration-150"
+        style={{
+          marginLeft: indent,
+          background: depth > 0 ? 'var(--gw2-bg-light)' : 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--gw2-bg-card-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = depth > 0 ? 'var(--gw2-bg-light)' : 'transparent';
+        }}
       >
+        {/* Depth indicator */}
+        {depth > 0 && (
+          <ChevronRight className="w-4 h-4" style={{ color: 'var(--gw2-text-muted)' }} />
+        )}
+
         {/* Item Icon */}
         {material.item.icon ? (
           <img
             src={material.item.icon}
             alt={material.item.name}
-            className={`w-8 h-8 rounded border ${
-              rarityColors[material.item.rarity]?.split(" ")[0] || "border-gray-500"
-            }`}
+            className="w-8 h-8 rounded"
+            style={{
+              border: `2px solid ${rarity.border}`,
+            }}
           />
         ) : (
-          <div className="w-8 h-8 rounded bg-slate-600 flex items-center justify-center">
-            <span className="text-xs text-gray-400">?</span>
+          <div
+            className="w-8 h-8 rounded flex items-center justify-center"
+            style={{
+              background: 'var(--gw2-bg-dark)',
+              border: '2px solid var(--gw2-border)',
+            }}
+          >
+            <span className="text-xs" style={{ color: 'var(--gw2-text-muted)' }}>?</span>
           </div>
         )}
 
         {/* Quantity */}
-        <span className="text-cyan-400 font-mono font-semibold min-w-[3rem]">
+        <span
+          className="font-mono font-semibold min-w-[3rem]"
+          style={{ color: 'var(--gw2-gold)' }}
+        >
           ×{material.quantity}
         </span>
 
         {/* Name */}
         <span
-          className={`flex-1 ${
-            rarityColors[material.item.rarity]?.split(" ")[1] || "text-gray-300"
-          }`}
+          className="flex-1"
+          style={{ color: rarity.text }}
         >
           {material.item.name}
         </span>
@@ -237,13 +318,27 @@ function MaterialRow({ material, depth }: MaterialRowProps) {
         {isCrafted ? (
           <span
             data-testid="material-crafted-indicator"
-            className="px-2 py-0.5 bg-indigo-600/20 text-indigo-400 text-xs rounded"
+            className="px-2 py-0.5 text-xs rounded flex items-center gap-1"
+            style={{
+              background: 'rgba(196, 31, 59, 0.2)',
+              color: 'var(--gw2-red-light)',
+              border: '1px solid var(--gw2-red)',
+            }}
           >
+            <Hammer className="w-3 h-3" />
             Crafted
           </span>
         ) : material.canCraft ? (
-          <span className="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 text-xs rounded">
-            Bought (cheaper)
+          <span
+            className="px-2 py-0.5 text-xs rounded flex items-center gap-1"
+            style={{
+              background: 'rgba(26, 147, 6, 0.2)',
+              color: 'var(--gw2-success)',
+              border: '1px solid var(--gw2-success)',
+            }}
+          >
+            <ShoppingCart className="w-3 h-3" />
+            Bought
           </span>
         ) : null}
 
@@ -272,4 +367,3 @@ function MaterialRow({ material, depth }: MaterialRowProps) {
 }
 
 export default CraftAnalysis;
-

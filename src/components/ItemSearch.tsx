@@ -3,7 +3,7 @@
  *
  * Provides a search input with dropdown results that queries items
  * from the database using server functions. Supports keyboard navigation
- * and displays item icons, names, and prices.
+ * and displays item icons, names, and prices. Styled with GW2 theme.
  *
  * @module components/ItemSearch
  *
@@ -49,17 +49,17 @@ export interface ItemSearchProps {
 }
 
 /**
- * Rarity color mapping.
+ * Rarity color mapping using GW2 official colors.
  */
-const rarityColors: Record<string, string> = {
-  Junk: "border-gray-500",
-  Basic: "border-gray-400",
-  Fine: "border-blue-400",
-  Masterwork: "border-green-400",
-  Rare: "border-yellow-400",
-  Exotic: "border-orange-400",
-  Ascended: "border-pink-400",
-  Legendary: "border-purple-400",
+const rarityColors: Record<string, { border: string; text: string }> = {
+  Junk: { border: "var(--rarity-junk)", text: "var(--rarity-junk)" },
+  Basic: { border: "var(--rarity-basic)", text: "var(--rarity-basic)" },
+  Fine: { border: "var(--rarity-fine)", text: "var(--rarity-fine)" },
+  Masterwork: { border: "var(--rarity-masterwork)", text: "var(--rarity-masterwork)" },
+  Rare: { border: "var(--rarity-rare)", text: "var(--rarity-rare)" },
+  Exotic: { border: "var(--rarity-exotic)", text: "var(--rarity-exotic)" },
+  Ascended: { border: "var(--rarity-ascended)", text: "var(--rarity-ascended)" },
+  Legendary: { border: "var(--rarity-legendary)", text: "var(--rarity-legendary)" },
 };
 
 /**
@@ -204,7 +204,10 @@ export function ItemSearch({
     <div ref={containerRef} className={`relative ${className}`} data-testid="item-search">
       {/* Search Input */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5"
+          style={{ color: 'var(--gw2-text-muted)' }}
+        />
         <input
           ref={inputRef}
           type="text"
@@ -214,12 +217,27 @@ export function ItemSearch({
           onFocus={() => results.length > 0 && setIsOpen(true)}
           placeholder={placeholder}
           autoFocus={autoFocus}
-          className="w-full pl-12 pr-12 py-4 bg-slate-800/80 backdrop-blur-sm border border-slate-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-lg"
+          className="w-full pl-12 pr-12 py-4 rounded-xl text-lg transition-all duration-200"
+          style={{
+            background: 'var(--gw2-bg-dark)',
+            border: '1px solid var(--gw2-border)',
+            color: 'var(--gw2-text-primary)',
+            boxShadow: 'var(--gw2-shadow-md)',
+          }}
+          onFocusCapture={(e) => {
+            e.currentTarget.style.borderColor = 'var(--gw2-gold)';
+            e.currentTarget.style.boxShadow = '0 0 0 2px var(--gw2-gold-glow), var(--gw2-shadow-md)';
+          }}
+          onBlurCapture={(e) => {
+            e.currentTarget.style.borderColor = 'var(--gw2-border)';
+            e.currentTarget.style.boxShadow = 'var(--gw2-shadow-md)';
+          }}
           data-testid="search-input"
         />
         {isLoading && (
           <Loader2
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-cyan-400 animate-spin"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin"
+            style={{ color: 'var(--gw2-gold)' }}
             data-testid="loading-indicator"
           />
         )}
@@ -228,65 +246,100 @@ export function ItemSearch({
       {/* Results Dropdown */}
       {isOpen && results.length > 0 && (
         <div
-          className="absolute z-50 w-full mt-2 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden"
+          className="absolute z-50 w-full mt-2 rounded-xl overflow-hidden"
+          style={{
+            background: 'var(--gw2-bg-medium)',
+            border: '1px solid var(--gw2-border)',
+            boxShadow: 'var(--gw2-shadow-lg)',
+          }}
           data-testid="search-results"
         >
-          {results.map((result, index) => (
-            <button
-              key={result.item.id}
-              onClick={() => handleSelect(result)}
-              className={`w-full flex items-center gap-3 p-3 text-left hover:bg-slate-700 transition-colors ${
-                index === selectedIndex ? "bg-slate-700" : ""
-              }`}
-              data-testid={`search-result-${result.item.id}`}
-            >
-              {/* Item Icon */}
-              {result.item.icon ? (
-                <img
-                  src={result.item.icon}
-                  alt={result.item.name}
-                  className={`w-10 h-10 rounded border ${
-                    rarityColors[result.item.rarity] || "border-gray-500"
-                  }`}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded bg-slate-600 flex items-center justify-center">
-                  <span className="text-xs text-gray-400">?</span>
-                </div>
-              )}
+          {results.map((result, index) => {
+            const rarity = rarityColors[result.item.rarity] || { border: 'var(--rarity-junk)', text: 'var(--gw2-text-secondary)' };
+            return (
+              <button
+                key={result.item.id}
+                onClick={() => handleSelect(result)}
+                className="w-full flex items-center gap-3 p-3 text-left transition-all duration-150"
+                style={{
+                  background: index === selectedIndex ? 'var(--gw2-bg-light)' : 'transparent',
+                  borderLeft: index === selectedIndex ? '3px solid var(--gw2-gold)' : '3px solid transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--gw2-bg-light)';
+                }}
+                onMouseLeave={(e) => {
+                  if (index !== selectedIndex) {
+                    e.currentTarget.style.background = 'transparent';
+                  }
+                }}
+                data-testid={`search-result-${result.item.id}`}
+              >
+                {/* Item Icon */}
+                {result.item.icon ? (
+                  <img
+                    src={result.item.icon}
+                    alt={result.item.name}
+                    className="w-10 h-10 rounded"
+                    style={{
+                      border: `2px solid ${rarity.border}`,
+                      boxShadow: `0 0 6px ${rarity.border}40`,
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 rounded flex items-center justify-center"
+                    style={{
+                      background: 'var(--gw2-bg-dark)',
+                      border: '2px solid var(--gw2-border)',
+                    }}
+                  >
+                    <span style={{ color: 'var(--gw2-text-muted)' }} className="text-xs">?</span>
+                  </div>
+                )}
 
-              {/* Item Info */}
-              <div className="flex-1 min-w-0">
-                <div className="text-white font-medium truncate">
-                  {result.item.name}
+                {/* Item Info */}
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="font-medium truncate"
+                    style={{ color: rarity.text }}
+                  >
+                    {result.item.name}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span style={{ color: 'var(--gw2-text-muted)' }}>{result.item.type}</span>
+                    {result.hasCraftingRecipe && (
+                      <span className="flex items-center gap-1" style={{ color: 'var(--gw2-red-light)' }}>
+                        <Hammer className="w-3 h-3" />
+                        Craftable
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-gray-400">{result.item.type}</span>
-                  {result.hasCraftingRecipe && (
-                    <span className="flex items-center gap-1 text-indigo-400">
-                      <Hammer className="w-3 h-3" />
-                      Craftable
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              {/* Price */}
-              {result.price && (
-                <div className="text-right">
-                  <div className="text-xs text-gray-400 mb-0.5">Sell Price</div>
-                  <PriceDisplay copper={result.price.sellPrice} size="sm" />
-                </div>
-              )}
-            </button>
-          ))}
+                {/* Price */}
+                {result.price && (
+                  <div className="text-right">
+                    <div className="text-xs mb-0.5" style={{ color: 'var(--gw2-text-muted)' }}>Sell Price</div>
+                    <PriceDisplay copper={result.price.sellPrice} size="sm" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
       {/* No Results */}
       {isOpen && query.length >= 2 && results.length === 0 && !isLoading && (
-        <div className="absolute z-50 w-full mt-2 bg-slate-800 border border-slate-600 rounded-xl p-6 text-center">
-          <p className="text-gray-400">No items found for "{query}"</p>
+        <div
+          className="absolute z-50 w-full mt-2 rounded-xl p-6 text-center"
+          style={{
+            background: 'var(--gw2-bg-medium)',
+            border: '1px solid var(--gw2-border)',
+          }}
+        >
+          <p style={{ color: 'var(--gw2-text-muted)' }}>No items found for "{query}"</p>
         </div>
       )}
     </div>
@@ -294,4 +347,3 @@ export function ItemSearch({
 }
 
 export default ItemSearch;
-

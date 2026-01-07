@@ -74,8 +74,8 @@ describe("CraftAnalysis", () => {
 
       const recommendation = screen.getByTestId("recommendation");
       expect(recommendation).toHaveTextContent(/craft/i);
-      // Check for craft-specific styling (blue/indigo)
-      expect(recommendation).toHaveClass(/bg-indigo|bg-blue/);
+      // Check for craft-specific styling via inline style (red/crimson theme)
+      expect(recommendation).toHaveStyle({ borderLeft: expect.stringContaining("var(--gw2-red)") });
     });
 
     it("displays buy recommendation with appropriate styling", () => {
@@ -89,8 +89,8 @@ describe("CraftAnalysis", () => {
 
       const recommendation = screen.getByTestId("recommendation");
       expect(recommendation).toHaveTextContent(/buy/i);
-      // Check for buy-specific styling (green/emerald)
-      expect(recommendation).toHaveClass(/bg-green|bg-emerald/);
+      // Check for buy-specific styling via inline style (green/success theme)
+      expect(recommendation).toHaveStyle({ borderLeft: expect.stringContaining("var(--gw2-success)") });
     });
   });
 
@@ -268,4 +268,3 @@ describe("CraftAnalysis", () => {
     });
   });
 });
-

@@ -37,13 +37,34 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'GW2 Economist - Buy or Craft Calculator',
+      },
+      {
+        name: 'description',
+        content: 'Find the cheapest way to get any item in Guild Wars 2. Compare buy vs craft prices with real-time Trading Post data.',
+      },
+      {
+        name: 'theme-color',
+        content: '#0a0908',
       },
     ],
     links: [
       {
         rel: 'stylesheet',
         href: appCss,
+      },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.googleapis.com',
+      },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossOrigin: 'anonymous',
+      },
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap',
       },
     ],
   }),

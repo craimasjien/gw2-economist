@@ -3,13 +3,13 @@
  *
  * This module defines the item detail route ('/items/:itemId') which displays
  * the full craft analysis for a specific item, including buy vs craft recommendation,
- * material breakdown, and nested recipe analysis.
+ * material breakdown, and nested recipe analysis. Styled with GW2 theme.
  *
  * @module routes/items/$itemId
  */
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, Hammer } from "lucide-react";
 import { CraftAnalysis } from "../../components/CraftAnalysis";
 import { ItemSearch } from "../../components/ItemSearch";
 import {
@@ -61,17 +61,17 @@ export const Route = createFileRoute("/items/$itemId")({
 });
 
 /**
- * Rarity color mapping.
+ * Rarity color mapping using GW2 official colors.
  */
-const rarityColors: Record<string, string> = {
-  Junk: "text-gray-400 border-gray-500",
-  Basic: "text-gray-300 border-gray-400",
-  Fine: "text-blue-400 border-blue-400",
-  Masterwork: "text-green-400 border-green-400",
-  Rare: "text-yellow-400 border-yellow-400",
-  Exotic: "text-orange-400 border-orange-400",
-  Ascended: "text-pink-400 border-pink-400",
-  Legendary: "text-purple-400 border-purple-400",
+const rarityColors: Record<string, { text: string; border: string }> = {
+  Junk: { text: "var(--rarity-junk)", border: "var(--rarity-junk)" },
+  Basic: { text: "var(--rarity-basic)", border: "var(--rarity-basic)" },
+  Fine: { text: "var(--rarity-fine)", border: "var(--rarity-fine)" },
+  Masterwork: { text: "var(--rarity-masterwork)", border: "var(--rarity-masterwork)" },
+  Rare: { text: "var(--rarity-rare)", border: "var(--rarity-rare)" },
+  Exotic: { text: "var(--rarity-exotic)", border: "var(--rarity-exotic)" },
+  Ascended: { text: "var(--rarity-ascended)", border: "var(--rarity-ascended)" },
+  Legendary: { text: "var(--rarity-legendary)", border: "var(--rarity-legendary)" },
 };
 
 /**
@@ -82,7 +82,7 @@ function ItemDetailPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-6">
+      <div className="min-h-screen gw2-bg-pattern p-6">
         <div className="max-w-4xl mx-auto">
           <BackLink />
           <ErrorMessage message={error} />
@@ -93,7 +93,7 @@ function ItemDetailPage() {
 
   if (!item) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-6">
+      <div className="min-h-screen gw2-bg-pattern p-6">
         <div className="max-w-4xl mx-auto">
           <BackLink />
           <ErrorMessage message="Item not found" />
@@ -102,17 +102,32 @@ function ItemDetailPage() {
     );
   }
 
-  const rarityClass = rarityColors[item.rarity] || "text-gray-300 border-gray-500";
+  const rarity = rarityColors[item.rarity] || { text: "var(--gw2-text-secondary)", border: "var(--gw2-border)" };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen gw2-bg-pattern">
       {/* Header with Search */}
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-700">
+      <header
+        className="sticky top-0 z-50 backdrop-blur-md"
+        style={{
+          background: 'rgba(10, 9, 8, 0.9)',
+          borderBottom: '1px solid var(--gw2-border)',
+        }}
+      >
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
             <Link
               to="/"
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200"
+              style={{ color: 'var(--gw2-text-secondary)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--gw2-gold)';
+                e.currentTarget.style.background = 'var(--gw2-bg-light)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--gw2-text-secondary)';
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
               <ArrowLeft className="w-5 h-5" />
               <span className="hidden sm:inline">Back</span>
@@ -126,23 +141,35 @@ function ItemDetailPage() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         {/* Item Header (for non-craftable items or additional info) */}
         {!analysis && (
-          <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6 mb-8">
+          <div
+            className="gw2-card p-6 mb-8"
+          >
             <div className="flex items-start gap-4">
               {item.icon && (
                 <img
                   src={item.icon}
                   alt={item.name}
-                  className={`w-20 h-20 rounded-lg border-2 ${rarityClass.split(" ")[1]}`}
+                  className="w-20 h-20 rounded-lg"
+                  style={{
+                    border: `2px solid ${rarity.border}`,
+                    boxShadow: `0 0 12px ${rarity.border}40`,
+                  }}
                 />
               )}
               <div className="flex-1">
-                <h1 className={`text-3xl font-bold ${rarityClass.split(" ")[0]}`}>
+                <h1
+                  className="text-3xl font-bold"
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    color: rarity.text,
+                  }}
+                >
                   {item.name}
                 </h1>
-                <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-400">
+                <div className="flex flex-wrap gap-3 mt-2 text-sm" style={{ color: 'var(--gw2-text-muted)' }}>
                   <span>{item.type}</span>
                   <span>•</span>
-                  <span className={rarityClass.split(" ")[0]}>{item.rarity}</span>
+                  <span style={{ color: rarity.text }}>{item.rarity}</span>
                   {item.level > 0 && (
                     <>
                       <span>•</span>
@@ -151,19 +178,19 @@ function ItemDetailPage() {
                   )}
                 </div>
                 {item.description && (
-                  <p className="mt-3 text-gray-400">{item.description}</p>
+                  <p className="mt-3" style={{ color: 'var(--gw2-text-secondary)' }}>{item.description}</p>
                 )}
               </div>
               {price && (
                 <div className="text-right">
-                  <div className="text-sm text-gray-400 mb-1">Trading Post</div>
+                  <div className="text-sm mb-1" style={{ color: 'var(--gw2-text-muted)' }}>Trading Post</div>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center justify-end gap-2">
-                      <span className="text-xs text-gray-500">Buy:</span>
+                      <span className="text-xs" style={{ color: 'var(--gw2-text-muted)' }}>Buy:</span>
                       <PriceDisplay copper={price.sellPrice} />
                     </div>
                     <div className="flex items-center justify-end gap-2">
-                      <span className="text-xs text-gray-500">Sell:</span>
+                      <span className="text-xs" style={{ color: 'var(--gw2-text-muted)' }}>Sell:</span>
                       <PriceDisplay copper={price.buyPrice} />
                     </div>
                   </div>
@@ -172,9 +199,15 @@ function ItemDetailPage() {
             </div>
 
             {/* Not Craftable Notice */}
-            <div className="mt-6 p-4 bg-slate-700/50 rounded-lg border border-slate-600">
-              <div className="flex items-center gap-3 text-gray-400">
-                <AlertCircle className="w-5 h-5 text-yellow-500" />
+            <div
+              className="mt-6 p-4 rounded-lg"
+              style={{
+                background: 'var(--gw2-bg-light)',
+                border: '1px solid var(--gw2-border)',
+              }}
+            >
+              <div className="flex items-center gap-3" style={{ color: 'var(--gw2-text-secondary)' }}>
+                <AlertCircle className="w-5 h-5" style={{ color: 'var(--gw2-warning)' }} />
                 <span>
                   This item cannot be crafted. It can only be obtained from the
                   Trading Post, drops, or other sources.
@@ -198,7 +231,14 @@ function BackLink() {
   return (
     <Link
       to="/"
-      className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+      className="inline-flex items-center gap-2 mb-6 transition-all duration-200"
+      style={{ color: 'var(--gw2-text-secondary)' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = 'var(--gw2-gold)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = 'var(--gw2-text-secondary)';
+      }}
     >
       <ArrowLeft className="w-5 h-5" />
       Back to search
@@ -211,10 +251,18 @@ function BackLink() {
  */
 function LoadingState() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+    <div className="min-h-screen gw2-bg-pattern flex items-center justify-center">
       <div className="text-center">
-        <Loader2 className="w-12 h-12 text-cyan-400 animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Loading item data...</p>
+        <div
+          className="inline-block p-4 rounded-xl mb-4 animate-gw2-glow"
+          style={{
+            background: 'var(--gw2-bg-card)',
+            border: '1px solid var(--gw2-border)',
+          }}
+        >
+          <Hammer className="w-12 h-12 animate-pulse" style={{ color: 'var(--gw2-gold)' }} />
+        </div>
+        <p style={{ color: 'var(--gw2-text-secondary)' }}>Analyzing craft costs...</p>
       </div>
     </div>
   );
@@ -225,7 +273,7 @@ function LoadingState() {
  */
 function ErrorState({ error }: { error: Error }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="min-h-screen gw2-bg-pattern p-6">
       <div className="max-w-4xl mx-auto">
         <BackLink />
         <ErrorMessage message={error.message} />
@@ -239,17 +287,42 @@ function ErrorState({ error }: { error: Error }) {
  */
 function ErrorMessage({ message }: { message: string }) {
   return (
-    <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-6">
+    <div
+      className="rounded-xl p-6"
+      style={{
+        background: 'rgba(196, 31, 59, 0.1)',
+        border: '1px solid var(--gw2-red)',
+      }}
+    >
       <div className="flex items-center gap-3">
-        <AlertCircle className="w-6 h-6 text-red-400" />
+        <AlertCircle className="w-6 h-6" style={{ color: 'var(--gw2-red)' }} />
         <div>
-          <h2 className="text-xl font-semibold text-red-400">Error</h2>
-          <p className="text-gray-400 mt-1">{message}</p>
+          <h2
+            className="text-xl font-semibold"
+            style={{
+              fontFamily: 'var(--font-display)',
+              color: 'var(--gw2-red)',
+            }}
+          >
+            Error
+          </h2>
+          <p className="mt-1" style={{ color: 'var(--gw2-text-secondary)' }}>{message}</p>
         </div>
       </div>
       <Link
         to="/"
-        className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-colors"
+        className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg transition-all duration-200"
+        style={{
+          background: 'var(--gw2-bg-light)',
+          color: 'var(--gw2-text-primary)',
+          border: '1px solid var(--gw2-border)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = 'var(--gw2-gold)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = 'var(--gw2-border)';
+        }}
       >
         <ArrowLeft className="w-4 h-4" />
         Return to search

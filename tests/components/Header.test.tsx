@@ -3,6 +3,7 @@
  *
  * Tests the header navigation, slide-out drawer functionality,
  * menu interactions, and collapsible sub-menu behavior.
+ * Updated for GW2-themed styling.
  *
  * @module tests/components/Header.test
  */
@@ -18,15 +19,29 @@ vi.mock("@tanstack/react-router", () => ({
     onClick,
     className,
     activeProps,
+    style,
+    onMouseEnter,
+    onMouseLeave,
     ...props
   }: {
     children: React.ReactNode;
     to: string;
     onClick?: () => void;
     className?: string;
-    activeProps?: { className?: string };
+    activeProps?: { className?: string; style?: React.CSSProperties };
+    style?: React.CSSProperties;
+    onMouseEnter?: React.MouseEventHandler;
+    onMouseLeave?: React.MouseEventHandler;
   }) => (
-    <a href={to} onClick={onClick} className={className} {...props}>
+    <a
+      href={to}
+      onClick={onClick}
+      className={className}
+      style={style}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      {...props}
+    >
       {children}
     </a>
   ),
@@ -44,10 +59,12 @@ describe("Header", () => {
       ).toBeInTheDocument();
     });
 
-    it("should render the logo", () => {
+    it("should render the brand/logo text", () => {
       render(<Header />);
 
-      expect(screen.getByAltText("TanStack Logo")).toBeInTheDocument();
+      // Check for GW2 Economist branding (updated from TanStack logo)
+      expect(screen.getByText("GW2")).toBeInTheDocument();
+      expect(screen.getByText("Economist")).toBeInTheDocument();
     });
 
     it("should have the navigation drawer closed by default", () => {
@@ -110,7 +127,8 @@ describe("Header", () => {
       const menuButton = screen.getByRole("button", { name: /open menu/i });
       fireEvent.click(menuButton);
 
-      expect(screen.getByText("Start - Server Functions")).toBeInTheDocument();
+      // Updated to match new navigation link text
+      expect(screen.getByText("Server Functions")).toBeInTheDocument();
     });
 
     it("should display API Request link", () => {
@@ -119,7 +137,7 @@ describe("Header", () => {
       const menuButton = screen.getByRole("button", { name: /open menu/i });
       fireEvent.click(menuButton);
 
-      expect(screen.getByText("Start - API Request")).toBeInTheDocument();
+      expect(screen.getByText("API Request")).toBeInTheDocument();
     });
 
     it("should display SSR Demos link", () => {
@@ -128,7 +146,7 @@ describe("Header", () => {
       const menuButton = screen.getByRole("button", { name: /open menu/i });
       fireEvent.click(menuButton);
 
-      expect(screen.getByText("Start - SSR Demos")).toBeInTheDocument();
+      expect(screen.getByText("SSR Demos")).toBeInTheDocument();
     });
 
     it("should close drawer when a link is clicked", () => {
