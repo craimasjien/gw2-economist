@@ -5,15 +5,22 @@
  * for items, recipes, and prices. It implements the DataAccess interface required
  * by the CraftCalculatorService.
  *
+ * Supports both basic data access and quantity-aware data access with order book
+ * (listing) support for bulk purchase analysis.
+ *
  * @module server/services/data-access
  *
  * @example
  * ```typescript
- * import { createDataAccess } from './data-access';
+ * import { createDataAccess, createQuantityAwareDataAccess } from './data-access';
  * import { db } from '../db';
  *
  * const dataAccess = createDataAccess(db);
  * const item = await dataAccess.getItem(12345);
+ *
+ * // For quantity-aware analysis
+ * const quantityAccess = createQuantityAwareDataAccess(db);
+ * const listing = await quantityAccess.getListing(12345);
  * ```
  */
 
@@ -21,7 +28,9 @@ import { eq, like, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { items, recipes, prices } from "../db/schema";
 import type { Item, Recipe, Price } from "../db/schema";
-import type { DataAccess } from "./craft-calculator.service";
+import type { DataAccess, QuantityAwareDataAccess } from "./craft-calculator.service";
+import type { GW2Listing } from "./gw2-api/types";
+import { GW2ApiClient } from "./gw2-api/client";
 
 /**
  * Creates a data access implementation for the given database.
@@ -190,6 +199,45 @@ export function createExtendedDataAccess(db: Database): ExtendedDataAccess {
         .where(sql`${prices.itemId} IN ${itemIds}`);
 
       return new Map(results.map((price) => [price.itemId, price]));
+    },
+  };
+}
+
+/**
+ * Creates a quantity-aware data access implementation that includes
+ * order book (listing) support from the GW2 API.
+ *
+ * @param db - Drizzle database instance
+ * @param apiClient - Optional GW2 API client (creates default if not provided)
+ * @returns QuantityAwareDataAccess implementation
+ *
+ * @example
+ * ```typescript
+ * const quantityAccess = createQuantityAwareDataAccess(db);
+ * const listing = await quantityAccess.getListing(12345);
+ * if (listing) {
+ *   console.log(`${listing.sells.length} price levels available`);
+ * }
+ * ```
+ */
+export function createQuantityAwareDataAccess(
+  db: Database,
+  apiClient?: GW2ApiClient
+): QuantityAwareDataAccess & ExtendedDataAccess {
+  const extendedAccess = createExtendedDataAccess(db);
+  const client = apiClient ?? new GW2ApiClient();
+
+  return {
+    ...extendedAccess,
+
+    /**
+     * Retrieves the full order book (listings) for an item from the GW2 API.
+     *
+     * @param itemId - Item ID
+     * @returns Listing data or null if not tradable
+     */
+    async getListing(itemId: number): Promise<GW2Listing | null> {
+      return client.getListing(itemId);
     },
   };
 }

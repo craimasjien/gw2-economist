@@ -2,15 +2,34 @@
  * @fileoverview Unit tests for the CraftAnalysis component.
  *
  * Tests verify correct rendering of buy vs craft recommendations,
- * visual highlighting, and material breakdown display.
+ * visual highlighting, material breakdown display, and clickable
+ * navigation for craftable materials.
  *
  * @module tests/components/CraftAnalysis.test
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { CraftAnalysis } from "../../src/components/CraftAnalysis";
 import type { SerializedCraftAnalysis } from "../../server/functions/craft-analysis";
+
+// Mock the router Link component
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, params, ...props }: { children: React.ReactNode; to: string; params?: Record<string, string>; [key: string]: unknown }) => {
+    // Build the href by replacing $param placeholders with actual values
+    let href = to;
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        href = href.replace(`$${key}`, value);
+      }
+    }
+    return (
+      <a href={href} data-testid="router-link" {...props}>
+        {children}
+      </a>
+    );
+  },
+}));
 
 /**
  * Creates a mock craft analysis for testing.
@@ -265,6 +284,195 @@ describe("CraftAnalysis", () => {
       // Should indicate item can't be bought (may have multiple matching elements)
       const elements = screen.getAllByText(/not tradeable|account bound|craft only/i);
       expect(elements.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("material navigation", () => {
+    it("makes craftable materials clickable with link to item detail page", () => {
+      const analysis = createMockAnalysis({
+        materials: [
+          {
+            item: {
+              id: 456,
+              name: "Craftable Component",
+              description: null,
+              type: "CraftingMaterial",
+              rarity: "Fine",
+              level: 0,
+              icon: "https://example.com/craftable.png",
+              vendorValue: 0,
+              chatLink: null,
+            },
+            quantity: 2,
+            unitPrice: 50,
+            totalPrice: 100,
+            canCraft: true,
+            usedBuyPrice: false,
+            craftAnalysis: createMockAnalysis({
+              item: {
+                id: 456,
+                name: "Craftable Component",
+                description: null,
+                type: "CraftingMaterial",
+                rarity: "Fine",
+                level: 0,
+                icon: "https://example.com/craftable.png",
+                vendorValue: 0,
+                chatLink: null,
+              },
+            }),
+          },
+        ],
+      });
+      render(<CraftAnalysis analysis={analysis} />);
+
+      // Craftable material should have a link
+      const link = screen.getByRole("link", { name: /Craftable Component/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/items/456");
+    });
+
+    it("makes materials with canCraft=true but bought clickable", () => {
+      const analysis = createMockAnalysis({
+        materials: [
+          {
+            item: {
+              id: 789,
+              name: "Buyable Craftable",
+              description: null,
+              type: "CraftingMaterial",
+              rarity: "Rare",
+              level: 0,
+              icon: null,
+              vendorValue: 0,
+              chatLink: null,
+            },
+            quantity: 1,
+            unitPrice: 100,
+            totalPrice: 100,
+            canCraft: true,
+            usedBuyPrice: true, // Chose to buy instead of craft
+          },
+        ],
+      });
+      render(<CraftAnalysis analysis={analysis} />);
+
+      // Even if we chose to buy, if it can be crafted, it should be clickable
+      const link = screen.getByRole("link", { name: /Buyable Craftable/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/items/789");
+    });
+
+    it("does not make non-craftable materials clickable", () => {
+      const analysis = createMockAnalysis({
+        materials: [
+          {
+            item: {
+              id: 999,
+              name: "Raw Material",
+              description: null,
+              type: "CraftingMaterial",
+              rarity: "Basic",
+              level: 0,
+              icon: null,
+              vendorValue: 0,
+              chatLink: null,
+            },
+            quantity: 5,
+            unitPrice: 10,
+            totalPrice: 50,
+            canCraft: false,
+            usedBuyPrice: true,
+          },
+        ],
+      });
+      render(<CraftAnalysis analysis={analysis} />);
+
+      // Non-craftable material should not be a link
+      const materialText = screen.getByText("Raw Material");
+      expect(materialText).toBeInTheDocument();
+      // The material should not be wrapped in a link
+      expect(materialText.closest("a")).toBeNull();
+    });
+
+    it("nested craftable materials are also clickable", () => {
+      const analysis = createMockAnalysis({
+        materials: [
+          {
+            item: {
+              id: 100,
+              name: "Top Level Craftable",
+              description: null,
+              type: "CraftingMaterial",
+              rarity: "Exotic",
+              level: 0,
+              icon: null,
+              vendorValue: 0,
+              chatLink: null,
+            },
+            quantity: 1,
+            unitPrice: 500,
+            totalPrice: 500,
+            canCraft: true,
+            usedBuyPrice: false,
+            craftAnalysis: {
+              ...createMockAnalysis(),
+              item: {
+                id: 100,
+                name: "Top Level Craftable",
+                description: null,
+                type: "CraftingMaterial",
+                rarity: "Exotic",
+                level: 0,
+                icon: null,
+                vendorValue: 0,
+                chatLink: null,
+              },
+              materials: [
+                {
+                  item: {
+                    id: 200,
+                    name: "Nested Craftable",
+                    description: null,
+                    type: "CraftingMaterial",
+                    rarity: "Rare",
+                    level: 0,
+                    icon: null,
+                    vendorValue: 0,
+                    chatLink: null,
+                  },
+                  quantity: 3,
+                  unitPrice: 100,
+                  totalPrice: 300,
+                  canCraft: true,
+                  usedBuyPrice: false,
+                  craftAnalysis: createMockAnalysis({
+                    item: {
+                      id: 200,
+                      name: "Nested Craftable",
+                      description: null,
+                      type: "CraftingMaterial",
+                      rarity: "Rare",
+                      level: 0,
+                      icon: null,
+                      vendorValue: 0,
+                      chatLink: null,
+                    },
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+      render(<CraftAnalysis analysis={analysis} />);
+
+      // Both top-level and nested craftable materials should be clickable
+      const topLink = screen.getByRole("link", { name: /Top Level Craftable/i });
+      expect(topLink).toHaveAttribute("href", "/items/100");
+
+      const nestedLink = screen.getByRole("link", { name: /Nested Craftable/i });
+      expect(nestedLink).toHaveAttribute("href", "/items/200");
     });
   });
 });

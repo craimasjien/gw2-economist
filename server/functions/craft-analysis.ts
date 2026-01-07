@@ -23,8 +23,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "../db";
-import { createExtendedDataAccess } from "../services/data-access";
-import { CraftCalculatorService } from "../services/craft-calculator.service";
+import { createExtendedDataAccess, createQuantityAwareDataAccess } from "../services/data-access";
+import { CraftCalculatorService, type QuantityAwareCraftAnalysis, type OptimalQuantityResult } from "../services/craft-calculator.service";
 import type { Item, Price } from "../db/schema";
 import {
   serializeItem,
@@ -46,6 +46,22 @@ const searchInputSchema = z.object({
  */
 const analyzeInputSchema = z.object({
   itemId: z.number().int().positive(),
+});
+
+/**
+ * Schema for quantity-aware analysis input validation.
+ */
+const quantityAnalyzeInputSchema = z.object({
+  itemId: z.number().int().positive(),
+  quantity: z.number().int().positive().max(10000),
+});
+
+/**
+ * Schema for optimal quantity analysis input validation.
+ */
+const optimalQuantityInputSchema = z.object({
+  itemId: z.number().int().positive(),
+  maxQuantity: z.number().int().positive().max(10000).optional().default(1000),
 });
 
 /**
@@ -188,4 +204,171 @@ export const getFlattenedMaterials = createServerFn({ method: "GET" })
       }));
     }
   );
+
+/**
+ * Serialized quantity-aware craft analysis for JSON transport.
+ *
+ * @interface SerializedQuantityAnalysis
+ */
+export interface SerializedQuantityAnalysis {
+  item: SerializedItem;
+  quantity: number;
+  canCraft: boolean;
+  recipe?: {
+    id: number;
+    type: string;
+    outputItemCount: number;
+  };
+  totalBuyCost: number;
+  averageBuyPrice: number;
+  totalCraftCost: number;
+  averageCraftCost: number;
+  recommendation: "buy" | "craft";
+  savings: number;
+  savingsPercent: number;
+  buyPriceImpact: number;
+  supplyAvailable: number;
+  supplyShortfall: number;
+  canFillOrder: boolean;
+  materialBreakdown?: Array<{
+    item: SerializedItem;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    decision: "buy" | "craft";
+  }>;
+}
+
+/**
+ * Serializes a quantity-aware craft analysis for JSON transport.
+ *
+ * @param analysis - Analysis to serialize
+ * @returns Serialized analysis
+ */
+function serializeQuantityAnalysis(
+  analysis: QuantityAwareCraftAnalysis
+): SerializedQuantityAnalysis {
+  return {
+    item: serializeItem(analysis.item),
+    quantity: analysis.quantity,
+    canCraft: analysis.canCraft,
+    recipe: analysis.recipe
+      ? {
+          id: analysis.recipe.id,
+          type: analysis.recipe.type,
+          outputItemCount: analysis.recipe.outputItemCount,
+        }
+      : undefined,
+    totalBuyCost: analysis.totalBuyCost,
+    averageBuyPrice: analysis.averageBuyPrice,
+    totalCraftCost: analysis.totalCraftCost,
+    averageCraftCost: analysis.averageCraftCost,
+    recommendation: analysis.recommendation,
+    savings: analysis.savings,
+    savingsPercent: analysis.savingsPercent,
+    buyPriceImpact: analysis.buyPriceImpact,
+    supplyAvailable: analysis.supplyAvailable,
+    supplyShortfall: analysis.supplyShortfall,
+    canFillOrder: analysis.canFillOrder,
+    materialBreakdown: analysis.materialBreakdown?.map((m) => ({
+      item: serializeItem(m.item),
+      quantity: m.quantity,
+      unitCost: m.unitCost,
+      totalCost: m.totalCost,
+      decision: m.decision,
+    })),
+  };
+}
+
+/**
+ * Server function to analyze craft cost for a specific quantity.
+ *
+ * Performs quantity-aware analysis that considers order book depth
+ * to determine the true cost of buying vs. crafting in bulk.
+ *
+ * @param data.itemId - The item ID to analyze
+ * @param data.quantity - Number of items to analyze
+ * @returns QuantityAwareCraftAnalysis result or null if item not found
+ *
+ * @example
+ * ```typescript
+ * // In a React component
+ * const analysis = await analyzeForQuantity({ data: { itemId: 12345, quantity: 100 } });
+ * if (analysis) {
+ *   console.log(`Buying 100 costs ${analysis.totalBuyCost}c`);
+ *   console.log(`Crafting 100 costs ${analysis.totalCraftCost}c`);
+ *   console.log(`Price impact from bulk: +${analysis.buyPriceImpact.toFixed(1)}%`);
+ * }
+ * ```
+ */
+export const analyzeForQuantity = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => {
+    return quantityAnalyzeInputSchema.parse(input);
+  })
+  .handler(async ({ data }): Promise<SerializedQuantityAnalysis | null> => {
+    const dataAccess = createQuantityAwareDataAccess(db);
+    const calculator = new CraftCalculatorService(dataAccess);
+
+    const analysis = await calculator.analyzeForQuantity(data.itemId, data.quantity);
+
+    if (!analysis) {
+      return null;
+    }
+
+    return serializeQuantityAnalysis(analysis);
+  });
+
+/**
+ * Serialized optimal quantity result for JSON transport.
+ *
+ * @interface SerializedOptimalQuantity
+ */
+export interface SerializedOptimalQuantity {
+  item: SerializedItem;
+  craftBetterAt: number;
+  hasCrossover: boolean;
+  baseBuyPrice: number;
+  baseCraftCost: number;
+}
+
+/**
+ * Server function to find the quantity at which crafting becomes better than buying.
+ *
+ * Uses binary search to find the crossover point where bulk buy prices
+ * make crafting more economical than purchasing.
+ *
+ * @param data.itemId - The item ID to analyze
+ * @param data.maxQuantity - Maximum quantity to search (default 1000)
+ * @returns OptimalQuantity result or null if item not found
+ *
+ * @example
+ * ```typescript
+ * const optimal = await findOptimalQuantity({ data: { itemId: 12345 } });
+ * if (optimal?.hasCrossover) {
+ *   console.log(`Crafting becomes better at ${optimal.craftBetterAt}+ items`);
+ * }
+ * ```
+ */
+export const findOptimalQuantity = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => {
+    return optimalQuantityInputSchema.parse(input);
+  })
+  .handler(async ({ data }): Promise<SerializedOptimalQuantity | null> => {
+    const dataAccess = createQuantityAwareDataAccess(db);
+    const calculator = new CraftCalculatorService(dataAccess);
+
+    const result = await calculator.findOptimalQuantity(data.itemId, data.maxQuantity);
+
+    if (!result) {
+      return null;
+    }
+
+    return {
+      item: serializeItem(result.item),
+      craftBetterAt: result.craftBetterAt,
+      hasCrossover: result.hasCrossover,
+      baseBuyPrice: result.baseBuyPrice,
+      baseCraftCost: result.baseCraftCost,
+    };
+  });
 

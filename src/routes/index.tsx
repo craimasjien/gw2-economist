@@ -50,9 +50,9 @@ function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen gw2-bg-pattern relative">
+    <div className="min-h-screen gw2-bg-pattern relative overflow-x-hidden">
       {/* Hero Section */}
-      <section className="relative py-20 px-6 text-center overflow-hidden">
+      <section className="relative py-20 px-6 text-center">
         {/* Background decorative elements */}
         <div
           className="absolute inset-0 pointer-events-none"

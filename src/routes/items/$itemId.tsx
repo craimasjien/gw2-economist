@@ -9,8 +9,9 @@
  */
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, AlertCircle, Loader2, Hammer } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, Hammer, Package } from "lucide-react";
 import { CraftAnalysis } from "../../components/CraftAnalysis";
+import { QuantityAnalysis } from "../../components/QuantityAnalysis";
 import { ItemSearch } from "../../components/ItemSearch";
 import {
   analyzeCraftCost,
@@ -217,8 +218,29 @@ function ItemDetailPage() {
           </div>
         )}
 
-        {/* Craft Analysis */}
-        {analysis && <CraftAnalysis analysis={analysis} />}
+        {/* Craft Analysis (Single Item) */}
+        {analysis && <CraftAnalysis analysis={analysis} className="mb-8" />}
+
+        {/* Quantity Analysis (Bulk Purchase) */}
+        <div className="mt-8">
+          <div className="flex items-center gap-3 mb-4">
+            <Package className="w-6 h-6" style={{ color: 'var(--gw2-gold)' }} />
+            <h2
+              className="text-2xl font-bold"
+              style={{
+                fontFamily: 'var(--font-display)',
+                color: 'var(--gw2-text-primary)',
+              }}
+            >
+              Bulk Analysis
+            </h2>
+          </div>
+          <p className="mb-4" style={{ color: 'var(--gw2-text-muted)' }}>
+            Buying in bulk? The trading post has limited supply at each price point.
+            Use this calculator to see the real cost when buying multiple items.
+          </p>
+          <QuantityAnalysis itemId={item.id} initialQuantity={1} />
+        </div>
       </main>
     </div>
   );

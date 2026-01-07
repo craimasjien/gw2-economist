@@ -1,6 +1,6 @@
 ---
 name: GW2 Economist App
-overview: Build a full-stack TanStack Start application with Drizzle ORM and PostgreSQL that fetches Guild Wars 2 trading post and recipe data, caches it locally, and helps users determine whether to buy or craft items based on market prices. Uses TDD methodology—tests are written before implementation for each feature.
+overview: Build a full-stack TanStack Start application with Drizzle ORM and PostgreSQL that fetches Guild Wars 2 trading post and recipe data, caches it locally, and helps users determine whether to buy or craft items based on market prices. Includes historical price tracking to discover profitable crafting opportunities. Uses TDD methodology—tests are written before implementation for each feature.
 todos:
   - id: project-setup
     content: Initialize TanStack Start project with pnpm and install dependencies
@@ -12,35 +12,77 @@ todos:
       - project-setup
   - id: db-schema
     content: Define Drizzle schema for items, recipes, and prices tables (tests first)
-    status: pending
+    status: completed
     dependencies:
       - docker-db
   - id: gw2-api-client
     content: Implement GW2 API client with file cache toggle (tests first)
-    status: pending
+    status: completed
     dependencies:
       - project-setup
   - id: sync-scripts
     content: Create pnpm sync commands for items, recipes, and prices
-    status: pending
+    status: completed
     dependencies:
       - db-schema
       - gw2-api-client
   - id: craft-calculator
     content: Build craft cost calculator service with recursive recipe analysis (tests first)
-    status: pending
+    status: completed
     dependencies:
       - db-schema
   - id: server-functions
     content: Create TanStack Start server functions for item search and analysis (tests first)
-    status: pending
+    status: completed
     dependencies:
       - craft-calculator
   - id: frontend-ui
     content: Build search UI and craft analysis display components (tests first)
-    status: pending
+    status: completed
     dependencies:
       - server-functions
+  - id: history-schema
+    content: Add price_history table to Drizzle schema with indexes (tests first)
+    status: pending
+    dependencies:
+      - db-schema
+  - id: history-sync
+    content: Create sync-history.ts script to record hourly price snapshots
+    status: pending
+    dependencies:
+      - history-schema
+      - sync-scripts
+  - id: history-cleanup
+    content: Create cleanup-history.ts script for 1-year data retention
+    status: pending
+    dependencies:
+      - history-schema
+  - id: trend-service
+    content: Implement TrendAnalysisService with TDD (price/volume trends)
+    status: pending
+    dependencies:
+      - history-schema
+  - id: profit-scanner
+    content: Implement ProfitOpportunityScanner service with TDD
+    status: pending
+    dependencies:
+      - trend-service
+      - craft-calculator
+  - id: profit-server-functions
+    content: Add getProfitableItems and getItemPriceTrend server functions
+    status: pending
+    dependencies:
+      - profit-scanner
+  - id: profit-dashboard-ui
+    content: Build ProfitDashboard and PriceTrendChart components (tests first)
+    status: pending
+    dependencies:
+      - profit-server-functions
+  - id: opportunities-route
+    content: Create /opportunities route with profit dashboard
+    status: pending
+    dependencies:
+      - profit-dashboard-ui
 ---
 
 # Guild Wars 2 Economist Application
@@ -52,12 +94,16 @@ graph TB
     subgraph client [Client Layer]
         UI[React UI]
         TanStackRouter[TanStack Router]
+        ProfitDash[Profit Dashboard]
+        TrendChart[Price Trend Charts]
     end
     
     subgraph server [Server Layer]
         ServerFn[Server Functions]
         CraftCalc[Craft Calculator Service]
         DataSync[Data Sync Service]
+        TrendSvc[Trend Analysis Service]
+        ProfitScan[Profit Scanner Service]
     end
     
     subgraph data [Data Layer]
@@ -69,22 +115,29 @@ graph TB
     subgraph storage [Storage]
         PostgreSQL[(PostgreSQL)]
         FileCache[Local JSON Files]
+        PriceHistory[(price_history table)]
     end
     
     UI --> TanStackRouter
+    ProfitDash --> ServerFn
+    TrendChart --> ServerFn
     TanStackRouter --> ServerFn
     ServerFn --> CraftCalc
     ServerFn --> DataSync
+    ServerFn --> TrendSvc
+    ServerFn --> ProfitScan
     CraftCalc --> DrizzleORM
+    TrendSvc --> DrizzleORM
+    ProfitScan --> TrendSvc
+    ProfitScan --> CraftCalc
     DataSync --> GW2API
     DataSync --> Cache
     GW2API --> FileCache
     Cache --> FileCache
     DrizzleORM --> PostgreSQL
+    DrizzleORM --> PriceHistory
     DataSync --> DrizzleORM
 ```
-
-
 
 ## TDD Methodology
 
@@ -121,16 +174,19 @@ gw2-economist/
 │   ├── routes/
 │   │   ├── __root.tsx
 │   │   ├── index.tsx           # Home/search page
+│   │   ├── opportunities.tsx   # Profit opportunities dashboard
 │   │   └── items/
 │   │       └── $itemId.tsx     # Item detail with craft analysis
 │   └── components/
 │       ├── ItemSearch.tsx
 │       ├── CraftAnalysis.tsx
-│       └── PriceDisplay.tsx
+│       ├── PriceDisplay.tsx
+│       ├── ProfitDashboard.tsx # Profitable items table
+│       └── PriceTrendChart.tsx # Historical price chart
 ├── server/
 │   ├── db/
 │   │   ├── index.ts            # Drizzle client
-│   │   └── schema.ts           # Database schema
+│   │   └── schema.ts           # Database schema (incl. price_history)
 │   ├── services/
 │   │   ├── gw2-api/
 │   │   │   ├── client.ts       # GW2 API client with caching
@@ -138,24 +194,28 @@ gw2-economist/
 │   │   │   └── cache.ts        # File cache implementation
 │   │   ├── items.service.ts
 │   │   ├── recipes.service.ts
-│   │   └── craft-calculator.service.ts
+│   │   ├── craft-calculator.service.ts
+│   │   ├── trend-analysis.service.ts    # Price/volume trend analysis
+│   │   └── profit-scanner.service.ts    # Find profitable crafts
 │   └── functions/
 │       ├── items.ts            # Server functions for items
 │       ├── recipes.ts          # Server functions for recipes
-│       └── craft-analysis.ts   # Server functions for analysis
+│       └── craft-analysis.ts   # Server functions for analysis + profits
 ├── scripts/
 │   ├── sync-items.ts           # Sync all items from API
 │   ├── sync-recipes.ts         # Sync all recipes from API
 │   ├── sync-prices.ts          # Sync trading post prices
+│   ├── sync-history.ts         # Record hourly price snapshots
+│   ├── cleanup-history.ts      # Remove data older than 1 year
 │   └── sync-all.ts             # Combined sync script
 ├── cache/                      # Local file cache (gitignored)
 └── tests/
     ├── services/
-    │   └── craft-calculator.test.ts
+    │   ├── craft-calculator.test.ts
+    │   ├── trend-analysis.test.ts
+    │   └── profit-scanner.test.ts
     └── setup.ts
 ```
-
-
 
 ## Phase 1: Project Foundation
 
@@ -173,8 +233,6 @@ Install additional dependencies:
 pnpm add drizzle-orm postgres dotenv zod
 pnpm add -D drizzle-kit vitest @testing-library/react jsdom tsx
 ```
-
-
 
 ### 1.2 Docker Compose Setup
 
@@ -196,8 +254,6 @@ services:
 volumes:
   postgres_data:
 ```
-
-
 
 ### 1.3 Environment Configuration
 
@@ -235,8 +291,6 @@ describe('Database Schema', () => {
 })
 ```
 
-
-
 ### 2.2 Drizzle Schema
 
 Define schema in `server/db/schema.ts` with three main tables:| Table | Purpose | Key Fields ||-------|---------|------------|| `items` | All GW2 items | id, name, type, rarity, icon, vendorValue || `recipes` | Crafting recipes | id, outputItemId, outputCount, disciplines, ingredients (JSON) || `prices` | Trading post prices | itemId, buyPrice, sellPrice, supply, demand, updatedAt |
@@ -268,8 +322,6 @@ describe('GW2ApiClient', () => {
 })
 ```
 
-
-
 ### 3.2 API Client with Cache Toggle
 
 Implement `server/services/gw2-api/client.ts`:
@@ -298,8 +350,6 @@ interface CacheAdapter {
 }
 ```
 
-
-
 - Store data as JSON files in `cache/{endpoint}/{id}.json`
 - Include TTL metadata for cache invalidation
 
@@ -322,8 +372,6 @@ Add to `package.json`:
   }
 }
 ```
-
-
 
 ### 4.2 Sync Logic
 
@@ -374,8 +422,6 @@ describe('CraftCalculatorService', () => {
 })
 ```
 
-
-
 ### 5.2 Core Algorithm
 
 Implement `server/services/craft-calculator.service.ts`:
@@ -421,8 +467,6 @@ export const searchItems = createServerFn({ method: 'GET' })
   })
 ```
 
-
-
 ## Phase 6: Frontend UI
 
 ### 6.1 Tests First: Component Tests
@@ -451,8 +495,6 @@ describe('CraftAnalysis', () => {
   it('shows material breakdown tree', () => {})
 })
 ```
-
-
 
 ### 6.2 Routes
 
@@ -491,6 +533,290 @@ sequenceDiagram
     CraftCalc->>DB: Get recipe + material prices
     CraftCalc-->>ServerFn: CraftAnalysis result
     ServerFn-->>UI: Display recommendation
+```
+
+## Phase 7: Historical Price Tracking and Profit Discovery
+
+### Goal
+
+Track hourly price snapshots over 1 year to identify profitable crafting opportunities: items with cheap materials that sell quickly on the trading post.
+
+### 7.1 Database Schema Extension
+
+Add `price_history` table to `server/db/schema.ts`:
+
+```typescript
+export const priceHistory = pgTable(
+  "price_history",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id").notNull(),
+    buyPrice: integer("buy_price").notNull(),
+    buyQuantity: integer("buy_quantity").notNull(),
+    sellPrice: integer("sell_price").notNull(),
+    sellQuantity: integer("sell_quantity").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("price_history_item_id_idx").on(table.itemId),
+    index("price_history_recorded_at_idx").on(table.recordedAt),
+    index("price_history_item_time_idx").on(table.itemId, table.recordedAt),
+  ]
+);
+```
+
+| Table | Purpose | Key Fields |
+
+|-------|---------|------------|
+
+| `price_history` | Hourly snapshots | itemId, buyPrice, sellPrice, buyQuantity, sellQuantity, recordedAt |
+
+### 7.2 Tests First: Schema Validation
+
+```typescript
+// tests/db/schema.test.ts (extend existing)
+describe('price_history table', () => {
+  it('has required columns for price tracking', () => {})
+  it('has composite index on itemId and recordedAt', () => {})
+  it('supports efficient time-range queries', () => {})
+})
+```
+
+### 7.3 Historical Sync Script
+
+Create `scripts/sync-history.ts`:
+
+- Records current prices from `prices` table into `price_history`
+- Called after `sync-prices` completes
+- Skips if last snapshot was < 1 hour ago (prevents duplicates)
+
+Add to `package.json`:
+
+```json
+{
+  "scripts": {
+    "sync:history": "tsx scripts/sync-history.ts",
+    "sync:all-with-history": "tsx scripts/sync-all.ts && tsx scripts/sync-history.ts",
+    "cleanup:history": "tsx scripts/cleanup-history.ts"
+  }
+}
+```
+
+### 7.4 Data Retention Cleanup
+
+Create `scripts/cleanup-history.ts`:
+
+- Deletes records where `recordedAt < NOW() - INTERVAL '1 year'`
+- Should be run weekly via cron
+- Logs deleted record count for monitoring
+
+### 7.5 Tests First: Trend Analysis Service
+
+```typescript
+// tests/services/trend-analysis.test.ts
+describe('TrendAnalysisService', () => {
+  it('calculates 24h price change correctly', async () => {})
+  it('calculates 7d price change correctly', async () => {})
+  it('identifies increasing volume trend', async () => {})
+  it('identifies decreasing volume trend', async () => {})
+  it('returns null for items with no history', async () => {})
+  it('calculates average daily volume', async () => {})
+})
+```
+
+### 7.6 Trend Analysis Service
+
+Create `server/services/trend-analysis.service.ts`:
+
+```typescript
+interface PriceTrend {
+  itemId: number;
+  currentPrice: number;
+  priceChange24h: number;
+  priceChangePercent24h: number;
+  priceChange7d: number;
+  priceChangePercent7d: number;
+  avgDailyVolume: number;
+  volumeTrend: "increasing" | "stable" | "decreasing";
+}
+
+class TrendAnalysisService {
+  async getPriceTrend(itemId: number, days?: number): Promise<PriceTrend | null>
+  async getVolumeHistory(itemId: number, days: number): Promise<VolumeDataPoint[]>
+  async getPriceHistory(itemId: number, days: number): Promise<PriceDataPoint[]>
+}
+```
+
+### 7.7 Tests First: Profit Scanner Service
+
+```typescript
+// tests/services/profit-scanner.test.ts
+describe('ProfitOpportunityScannerService', () => {
+  it('calculates net profit after 15% TP tax', async () => {})
+  it('ranks items by profit score (profit × sqrt(volume))', async () => {})
+  it('filters by minimum daily volume', async () => {})
+  it('filters by minimum profit margin', async () => {})
+  it('excludes items that cannot be crafted', async () => {})
+  it('uses craft cost from CraftCalculatorService', async () => {})
+})
+```
+
+### 7.8 Profit Scanner Service
+
+Create `server/services/profit-scanner.service.ts`:
+
+```typescript
+interface ProfitableItem {
+  item: Item;
+  recipe: Recipe;
+  craftCost: number;
+  sellPrice: number;
+  profit: number;           // After 15% TP tax
+  profitMargin: number;     // profit / sellPrice
+  dailyVolume: number;      // How fast it sells
+  profitScore: number;      // profit × sqrt(dailyVolume)
+}
+
+class ProfitOpportunityScannerService {
+  async getTopProfitableItems(options: {
+    limit?: number;
+    minDailyVolume?: number;
+    minProfitMargin?: number;
+    disciplines?: string[];
+  }): Promise<ProfitableItem[]>
+}
+```
+
+**Profit Score Formula:**
+
+```
+netProfit = sellPrice × 0.85 - craftCost  // 15% TP tax
+profitScore = netProfit × sqrt(dailyVolume)
+```
+
+Using `sqrt(volume)` prevents high-volume low-margin items from dominating while still rewarding items that sell frequently.
+
+### 7.9 Server Functions
+
+Extend `server/functions/craft-analysis.ts`:
+
+```typescript
+export const getProfitableItems = createServerFn({ method: 'GET' })
+  .validator(z.object({
+    limit: z.number().default(50),
+    minDailyVolume: z.number().default(10),
+    minProfitMargin: z.number().default(0.05),
+  }))
+  .handler(async ({ data }) => {
+    // Use ProfitOpportunityScannerService
+  });
+
+export const getItemPriceTrend = createServerFn({ method: 'GET' })
+  .validator(z.object({
+    itemId: z.number(),
+    days: z.number().default(7),
+  }))
+  .handler(async ({ data }) => {
+    // Use TrendAnalysisService
+  });
+```
+
+### 7.10 Tests First: Frontend Components
+
+```typescript
+// tests/components/ProfitDashboard.test.tsx
+describe('ProfitDashboard', () => {
+  it('displays profitable items in a sortable table', () => {})
+  it('sorts by profit score by default', () => {})
+  it('allows sorting by profit, margin, and volume', () => {})
+  it('shows loading state while fetching', () => {})
+  it('links to item detail page', () => {})
+})
+
+// tests/components/PriceTrendChart.test.tsx
+describe('PriceTrendChart', () => {
+  it('renders price line chart', () => {})
+  it('shows volume bars overlay', () => {})
+  it('supports time range selection (24h, 7d, 30d)', () => {})
+  it('displays current price and change', () => {})
+})
+```
+
+### 7.11 Frontend Components
+
+Create `src/components/ProfitDashboard.tsx`:
+
+- Table showing top profitable items
+- Columns: Item, Craft Cost, Sell Price, Profit, Margin, Volume, Score
+- Sortable headers
+- Click row to navigate to item detail
+
+Create `src/components/PriceTrendChart.tsx`:
+
+- Line chart for price history
+- Volume bars as secondary axis
+- Time range selector: 24h, 7d, 30d, 90d
+- Current price and % change display
+
+### 7.12 Opportunities Route
+
+Create `src/routes/opportunities.tsx`:
+
+- Route: `/opportunities`
+- Uses `ProfitDashboard` component
+- Filter controls for discipline, min volume, min margin
+- Auto-refresh every 5 minutes
+
+| Route | Component | Purpose |
+
+|-------|-----------|---------|
+
+| `/opportunities` | OpportunitiesPage | Profit opportunities dashboard |
+
+### Storage Estimate
+
+| Metric | Value |
+
+|--------|-------|
+
+| Items tracked | ~27,000 |
+
+| Snapshots/day | 24 |
+
+| Rows/year | ~236 million |
+
+| Row size | ~50 bytes |
+
+| Total size | ~12 GB/year |
+
+### Historical Data Flow
+
+```mermaid
+sequenceDiagram
+    participant Cron
+    participant SyncPrices
+    participant SyncHistory
+    participant DB
+    participant TrendSvc
+    participant ProfitScan
+    participant UI
+    
+    Note over Cron,DB: Hourly Background Job
+    Cron->>SyncPrices: pnpm sync:prices
+    SyncPrices->>DB: Upsert current prices
+    SyncPrices->>SyncHistory: Trigger history sync
+    SyncHistory->>DB: INSERT into price_history
+    
+    Note over UI,DB: User Views Opportunities
+    UI->>ProfitScan: getProfitableItems()
+    ProfitScan->>TrendSvc: Get volume trends
+    TrendSvc->>DB: Query price_history
+    ProfitScan->>DB: Get craft costs
+    ProfitScan-->>UI: Ranked profitable items
+
+
+
+
 
 
 

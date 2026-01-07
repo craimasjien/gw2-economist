@@ -15,6 +15,7 @@
  * ```
  */
 
+import { Link } from "@tanstack/react-router";
 import { PriceDisplay } from "./PriceDisplay";
 import type {
   SerializedCraftAnalysis,
@@ -250,11 +251,82 @@ interface MaterialRowProps {
 
 /**
  * Displays a single material row with optional nested materials.
+ * Craftable materials are rendered as clickable links to their detail pages.
  */
 function MaterialRow({ material, depth }: MaterialRowProps) {
   const indent = depth * 24;
   const isCrafted = !material.usedBuyPrice && material.craftAnalysis;
+  const isClickable = material.canCraft;
   const rarity = rarityColors[material.item.rarity] || { border: "var(--gw2-border)", text: "var(--gw2-text-secondary)" };
+
+  /**
+   * Renders the item icon element.
+   */
+  const renderIcon = () => {
+    if (material.item.icon) {
+      return (
+        <img
+          src={material.item.icon}
+          alt={material.item.name}
+          className="w-8 h-8 rounded"
+          style={{
+            border: `2px solid ${rarity.border}`,
+          }}
+        />
+      );
+    }
+    return (
+      <div
+        className="w-8 h-8 rounded flex items-center justify-center"
+        style={{
+          background: 'var(--gw2-bg-dark)',
+          border: '2px solid var(--gw2-border)',
+        }}
+      >
+        <span className="text-xs" style={{ color: 'var(--gw2-text-muted)' }}>?</span>
+      </div>
+    );
+  };
+
+  /**
+   * Renders the item name and icon, wrapped in a link if craftable.
+   */
+  const renderItemContent = () => {
+    const content = (
+      <>
+        {renderIcon()}
+        {/* Quantity */}
+        <span
+          className="font-mono font-semibold min-w-[3rem]"
+          style={{ color: 'var(--gw2-gold)' }}
+        >
+          ×{material.quantity}
+        </span>
+        {/* Name */}
+        <span
+          className="flex-1"
+          style={{ color: rarity.text }}
+        >
+          {material.item.name}
+        </span>
+      </>
+    );
+
+    if (isClickable) {
+      return (
+        <Link
+          to="/items/$itemId"
+          params={{ itemId: String(material.item.id) }}
+          className="flex items-center gap-3 flex-1 hover:opacity-80 transition-opacity"
+          title={`View ${material.item.name} details`}
+        >
+          {content}
+        </Link>
+      );
+    }
+
+    return <div className="flex items-center gap-3 flex-1">{content}</div>;
+  };
 
   return (
     <>
@@ -276,43 +348,8 @@ function MaterialRow({ material, depth }: MaterialRowProps) {
           <ChevronRight className="w-4 h-4" style={{ color: 'var(--gw2-text-muted)' }} />
         )}
 
-        {/* Item Icon */}
-        {material.item.icon ? (
-          <img
-            src={material.item.icon}
-            alt={material.item.name}
-            className="w-8 h-8 rounded"
-            style={{
-              border: `2px solid ${rarity.border}`,
-            }}
-          />
-        ) : (
-          <div
-            className="w-8 h-8 rounded flex items-center justify-center"
-            style={{
-              background: 'var(--gw2-bg-dark)',
-              border: '2px solid var(--gw2-border)',
-            }}
-          >
-            <span className="text-xs" style={{ color: 'var(--gw2-text-muted)' }}>?</span>
-          </div>
-        )}
-
-        {/* Quantity */}
-        <span
-          className="font-mono font-semibold min-w-[3rem]"
-          style={{ color: 'var(--gw2-gold)' }}
-        >
-          ×{material.quantity}
-        </span>
-
-        {/* Name */}
-        <span
-          className="flex-1"
-          style={{ color: rarity.text }}
-        >
-          {material.item.name}
-        </span>
+        {/* Item Icon, Quantity, and Name - wrapped in link if craftable */}
+        {renderItemContent()}
 
         {/* Crafted/Bought Indicator */}
         {isCrafted ? (

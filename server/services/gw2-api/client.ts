@@ -31,6 +31,7 @@ import type {
   GW2Item,
   GW2Recipe,
   GW2Price,
+  GW2Listing,
   GW2BatchResult,
   GW2ApiError,
 } from "./types";
@@ -60,6 +61,12 @@ const RECIPE_CACHE_TTL = 24 * 60 * 60 * 1000;
  * Prices change more frequently than item/recipe data.
  */
 const PRICE_CACHE_TTL = 60 * 60 * 1000;
+
+/**
+ * Default TTL for cached listings in milliseconds (15 minutes).
+ * Order book depth changes very frequently as trades occur.
+ */
+const LISTING_CACHE_TTL = 15 * 60 * 1000;
 
 /**
  * Initial delay for exponential backoff in milliseconds.
@@ -672,6 +679,142 @@ export class GW2ApiClient {
 
       try {
         const batchItems = await this.getPrices(batchIds);
+        items.push(...batchItems);
+
+        const returnedIds = new Set(batchItems.map((item) => item.id));
+        for (const id of batchIds) {
+          if (!returnedIds.has(id)) {
+            failedIds.push(id);
+          }
+        }
+      } catch (error) {
+        failedIds.push(...batchIds);
+        errors.push(
+          error instanceof Error ? error.message : "Unknown error"
+        );
+      }
+
+      if (onProgress) {
+        onProgress({ current: Math.min(i + BATCH_SIZE, total), total });
+      }
+
+      if (i + BATCH_SIZE < ids.length) {
+        await this.sleep(100);
+      }
+    }
+
+    return { items, failedIds, errors };
+  }
+
+  /**
+   * Fetches order book listing data for a single item.
+   *
+   * Returns the full order book with all buy orders and sell listings
+   * at every price level, enabling accurate bulk purchase cost calculations.
+   *
+   * @param id - Item ID
+   * @returns Listing data or null if not tradable
+   *
+   * @example
+   * ```typescript
+   * const listing = await client.getListing(12345);
+   * if (listing) {
+   *   // Calculate cost to buy 100 units
+   *   let remaining = 100;
+   *   let totalCost = 0;
+   *   for (const entry of listing.sells) {
+   *     const take = Math.min(remaining, entry.quantity);
+   *     totalCost += take * entry.unit_price;
+   *     remaining -= take;
+   *     if (remaining <= 0) break;
+   *   }
+   * }
+   * ```
+   */
+  async getListing(id: number): Promise<GW2Listing | null> {
+    const cacheKey = `listings/${id}`;
+    const cached = await this.cache.get<GW2Listing>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const listing = await this.fetchWithRetry<GW2Listing>(
+        `${GW2_API_BASE}/commerce/listings/${id}`
+      );
+      await this.cache.set(cacheKey, listing, LISTING_CACHE_TTL);
+      return listing;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Fetches order book listing data for multiple items (batch request).
+   *
+   * @param ids - Array of item IDs (max 200)
+   * @returns Array of listing data
+   */
+  async getListings(ids: number[]): Promise<GW2Listing[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    // Check cache first
+    const uncachedIds: number[] = [];
+    const cachedListings: GW2Listing[] = [];
+
+    for (const id of ids) {
+      const cached = await this.cache.get<GW2Listing>(`listings/${id}`);
+      if (cached) {
+        cachedListings.push(cached);
+      } else {
+        uncachedIds.push(id);
+      }
+    }
+
+    // Fetch uncached listings
+    if (uncachedIds.length > 0) {
+      const url = `${GW2_API_BASE}/commerce/listings?ids=${uncachedIds.join(",")}`;
+      try {
+        const listings = await this.fetchWithRetry<GW2Listing[]>(url);
+
+        // Cache fetched listings
+        for (const listing of listings) {
+          await this.cache.set(`listings/${listing.id}`, listing, LISTING_CACHE_TTL);
+        }
+
+        cachedListings.push(...listings);
+      } catch (error) {
+        console.error("Failed to fetch listings batch:", error);
+      }
+    }
+
+    return cachedListings;
+  }
+
+  /**
+   * Fetches all listings in batches with progress tracking.
+   *
+   * @param ids - Array of all item IDs to fetch listings for
+   * @param onProgress - Optional progress callback
+   * @returns Batch result with listings and any failed IDs
+   */
+  async getListingsBatch(
+    ids: number[],
+    onProgress?: (progress: { current: number; total: number }) => void
+  ): Promise<GW2BatchResult<GW2Listing>> {
+    const items: GW2Listing[] = [];
+    const failedIds: number[] = [];
+    const errors: string[] = [];
+    const total = ids.length;
+
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batchIds = ids.slice(i, i + BATCH_SIZE);
+
+      try {
+        const batchItems = await this.getListings(batchIds);
         items.push(...batchItems);
 
         const returnedIds = new Set(batchItems.map((item) => item.id));

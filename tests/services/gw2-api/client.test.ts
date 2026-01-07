@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { GW2ApiClient } from "../../../server/services/gw2-api/client";
 import type { CacheAdapter } from "../../../server/services/gw2-api/cache";
-import type { GW2Item, GW2Recipe, GW2Price } from "../../../server/services/gw2-api/types";
+import type { GW2Item, GW2Recipe, GW2Price, GW2Listing, GW2ListingEntry } from "../../../server/services/gw2-api/types";
 
 /**
  * Mock cache adapter for testing.
@@ -898,6 +898,169 @@ describe("GW2ApiClient", () => {
       // because getItems catches it and doesn't throw
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe("listings (order book)", () => {
+    /**
+     * Sample listing with multiple price levels for testing order book calculations.
+     */
+    const mockListing: GW2Listing = {
+      id: 12345,
+      buys: [
+        { listings: 5, quantity: 100, unit_price: 450 },
+        { listings: 3, quantity: 50, unit_price: 440 },
+        { listings: 10, quantity: 200, unit_price: 430 },
+      ],
+      sells: [
+        { listings: 2, quantity: 50, unit_price: 500 },
+        { listings: 5, quantity: 100, unit_price: 510 },
+        { listings: 8, quantity: 250, unit_price: 520 },
+      ],
+    };
+
+    const mockListings: GW2Listing[] = [
+      mockListing,
+      {
+        id: 12346,
+        buys: [
+          { listings: 2, quantity: 30, unit_price: 300 },
+        ],
+        sells: [
+          { listings: 1, quantity: 20, unit_price: 400 },
+        ],
+      },
+    ];
+
+    it("should fetch listing for a single item", async () => {
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockListing));
+
+      const listing = await client.getListing(12345);
+
+      expect(listing).toEqual(mockListing);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.guildwars2.com/v2/commerce/listings/12345",
+        expect.any(Object)
+      );
+    });
+
+    it("should use cached listing when available", async () => {
+      await mockCache.set("listings/12345", mockListing);
+
+      const listing = await client.getListing(12345);
+
+      expect(listing).toEqual(mockListing);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("should return null for non-tradable items", async () => {
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse({ text: "no such id" }, 404));
+
+      const listing = await client.getListing(99999);
+
+      expect(listing).toBeNull();
+    });
+
+    describe("getListings (batch)", () => {
+      it("should fetch multiple listings by ID array", async () => {
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockListings));
+
+        const listings = await client.getListings([12345, 12346]);
+
+        expect(listings).toHaveLength(2);
+        expect(listings).toEqual(mockListings);
+      });
+
+      it("should return empty array for empty ID list", async () => {
+        const listings = await client.getListings([]);
+
+        expect(listings).toEqual([]);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      });
+
+      it("should use cached listings and only fetch uncached ones", async () => {
+        await mockCache.set("listings/12345", mockListings[0]);
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse([mockListings[1]]));
+
+        const listings = await client.getListings([12345, 12346]);
+
+        expect(listings).toHaveLength(2);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          "https://api.guildwars2.com/v2/commerce/listings?ids=12346",
+          expect.any(Object)
+        );
+      });
+
+      it("should cache newly fetched listings", async () => {
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockListings));
+
+        await client.getListings([12345, 12346]);
+
+        expect(await mockCache.get("listings/12345")).toEqual(mockListings[0]);
+        expect(await mockCache.get("listings/12346")).toEqual(mockListings[1]);
+      });
+
+      it("should handle fetch errors gracefully", async () => {
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        fetchSpy.mockRejectedValueOnce(new Error("Network error"));
+
+        const listings = await client.getListings([12345, 12346]);
+
+        expect(listings).toEqual([]);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Failed to fetch listings batch:",
+          expect.any(Error)
+        );
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe("getListingsBatch (large batch with progress)", () => {
+      it("should batch requests in chunks of 200", async () => {
+        const ids = Array.from({ length: 450 }, (_, i) => i + 1);
+        const batch1 = ids.slice(0, 200).map((id) => ({ ...mockListing, id }));
+        const batch2 = ids.slice(200, 400).map((id) => ({ ...mockListing, id }));
+        const batch3 = ids.slice(400, 450).map((id) => ({ ...mockListing, id }));
+
+        fetchSpy
+          .mockResolvedValueOnce(mockFetchResponse(batch1))
+          .mockResolvedValueOnce(mockFetchResponse(batch2))
+          .mockResolvedValueOnce(mockFetchResponse(batch3));
+
+        const result = await client.getListingsBatch(ids);
+
+        expect(result.items).toHaveLength(450);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+      });
+
+      it("should report progress during batch fetching", async () => {
+        const ids = [12345, 12346, 12347];
+        const mockItems = ids.map((id) => ({ ...mockListing, id }));
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockItems));
+
+        const progressUpdates: Array<{ current: number; total: number }> = [];
+
+        await client.getListingsBatch(ids, (progress) => {
+          progressUpdates.push({ ...progress });
+        });
+
+        expect(progressUpdates.length).toBeGreaterThan(0);
+        expect(progressUpdates[progressUpdates.length - 1].current).toBe(ids.length);
+      });
+
+      it("should track failed IDs", async () => {
+        const ids = [12345, 12346, 12347];
+        const mockItems = [
+          { ...mockListing, id: 12345 },
+          { ...mockListing, id: 12346 },
+        ];
+        fetchSpy.mockResolvedValueOnce(mockFetchResponse(mockItems));
+
+        const result = await client.getListingsBatch(ids);
+
+        expect(result.items).toHaveLength(2);
+        expect(result.failedIds).toContain(12347);
+      });
     });
   });
 });
