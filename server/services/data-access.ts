@@ -270,7 +270,7 @@ export function createTrendDataAccess(db: Database): TrendDataAccess {
         .where(
           and(
             eq(priceHistory.itemId, itemId),
-            gte(priceHistory.recordedAt, fromDate)
+            sql`${priceHistory.recordedAt} >= ${fromDate.toISOString()}`
           )
         )
         .orderBy(priceHistory.recordedAt);

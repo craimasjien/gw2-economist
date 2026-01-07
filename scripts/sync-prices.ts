@@ -19,6 +19,7 @@
 
 import "dotenv/config";
 import { db, prices } from "../server/db";
+import { sql } from "drizzle-orm";
 import { GW2ApiClient, type GW2Price } from "../server/services/gw2-api";
 import type { NewPrice } from "../server/db/schema";
 
@@ -63,11 +64,12 @@ async function upsertPrices(priceBatch: NewPrice[]): Promise<void> {
     .onConflictDoUpdate({
       target: prices.itemId,
       set: {
-        buyPrice: prices.buyPrice,
-        buyQuantity: prices.buyQuantity,
-        sellPrice: prices.sellPrice,
-        sellQuantity: prices.sellQuantity,
-        updatedAt: new Date(),
+        // Use 'excluded' to reference the NEW values being inserted
+        buyPrice: sql`excluded.buy_price`,
+        buyQuantity: sql`excluded.buy_quantity`,
+        sellPrice: sql`excluded.sell_price`,
+        sellQuantity: sql`excluded.sell_quantity`,
+        updatedAt: sql`excluded.updated_at`,
       },
     });
 }
