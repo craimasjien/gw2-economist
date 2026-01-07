@@ -48,6 +48,13 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  server: {
+    watch: {
+      // Ignore the cache directory to prevent file watcher exhaustion
+      // The cache contains thousands of JSON files that don't need HMR
+      ignored: ['**/cache/**'],
+    },
+  },
 })
 
 export default config

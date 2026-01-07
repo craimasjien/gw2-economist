@@ -1,127 +1,102 @@
 /**
- * @fileoverview Home page route displaying the TanStack Start landing page.
+ * @fileoverview Home page with item search for the GW2 Economist application.
  *
- * This module defines the index route ('/') which serves as the landing page
- * for the application. It showcases TanStack Start features with a modern,
- * gradient-styled hero section and feature cards.
+ * This module defines the index route ('/') which provides a search interface
+ * for finding GW2 items and analyzing their craft costs. Users can search for
+ * items and navigate to the detail page for full craft analysis.
  *
  * @module routes/index
  */
 
-import { createFileRoute } from '@tanstack/react-router'
-import {
-  Zap,
-  Server,
-  Route as RouteIcon,
-  Shield,
-  Waves,
-  Sparkles,
-} from 'lucide-react'
+import { createFileRoute } from "@tanstack/react-router";
+import { Hammer, TrendingUp, Search } from "lucide-react";
+import { ItemSearch } from "../components/ItemSearch";
 
 /**
  * Index route configuration for the home page.
  */
-export const Route = createFileRoute('/')({ component: App })
+export const Route = createFileRoute("/")({ component: HomePage });
 
 /**
- * Home page component displaying TanStack Start features.
+ * Home page component with item search.
  *
- * Renders a hero section with logo and tagline, followed by a grid
- * of feature cards highlighting the framework's capabilities.
+ * Renders a hero section with the application title and search bar,
+ * followed by feature highlights explaining what the app does.
  *
- * @returns The home page layout with hero and features sections
+ * @returns The home page layout
  */
-function App() {
+function HomePage() {
   const features = [
     {
-      icon: <Zap className="w-12 h-12 text-cyan-400" />,
-      title: 'Powerful Server Functions',
+      icon: <Search className="w-10 h-10 text-cyan-400" />,
+      title: "Search Any Item",
       description:
-        'Write server-side code that seamlessly integrates with your client components. Type-safe, secure, and simple.',
+        "Find any craftable item in Guild Wars 2 by name. We have data on over 30,000 items and 12,000 recipes.",
     },
     {
-      icon: <Server className="w-12 h-12 text-cyan-400" />,
-      title: 'Flexible Server Side Rendering',
+      icon: <Hammer className="w-10 h-10 text-indigo-400" />,
+      title: "Analyze Craft Costs",
       description:
-        'Full-document SSR, streaming, and progressive enhancement out of the box. Control exactly what renders where.',
+        "See the complete material breakdown with recursive recipe analysis. We calculate the cheapest way to get each material.",
     },
     {
-      icon: <RouteIcon className="w-12 h-12 text-cyan-400" />,
-      title: 'API Routes',
+      icon: <TrendingUp className="w-10 h-10 text-emerald-400" />,
+      title: "Buy vs Craft Decision",
       description:
-        'Build type-safe API endpoints alongside your application. No separate backend needed.',
+        "Get instant recommendations on whether to buy directly from the Trading Post or craft the item yourself.",
     },
-    {
-      icon: <Shield className="w-12 h-12 text-cyan-400" />,
-      title: 'Strongly Typed Everything',
-      description:
-        'End-to-end type safety from server to client. Catch errors before they reach production.',
-    },
-    {
-      icon: <Waves className="w-12 h-12 text-cyan-400" />,
-      title: 'Full Streaming Support',
-      description:
-        'Stream data from server to client progressively. Perfect for AI applications and real-time updates.',
-    },
-    {
-      icon: <Sparkles className="w-12 h-12 text-cyan-400" />,
-      title: 'Next Generation Ready',
-      description:
-        'Built from the ground up for modern web applications. Deploy anywhere JavaScript runs.',
-    },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      <section className="relative py-20 px-6 text-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10"></div>
-        <div className="relative max-w-5xl mx-auto">
-          <div className="flex items-center justify-center gap-6 mb-6">
-            <img
-              src="/tanstack-circle-logo.png"
-              alt="TanStack Logo"
-              className="w-24 h-24 md:w-32 md:h-32"
-            />
-            <h1 className="text-6xl md:text-7xl font-black text-white [letter-spacing:-0.08em]">
-              <span className="text-gray-300">TANSTACK</span>{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                START
-              </span>
-            </h1>
-          </div>
-          <p className="text-2xl md:text-3xl text-gray-300 mb-4 font-light">
-            The framework for next generation AI applications
-          </p>
-          <p className="text-lg text-gray-400 max-w-3xl mx-auto mb-8">
-            Full-stack framework powered by TanStack Router for React and Solid.
-            Build modern applications with server functions, streaming, and type
-            safety.
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <a
-              href="https://tanstack.com/start"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-cyan-500/50"
-            >
-              Documentation
-            </a>
-            <p className="text-gray-400 text-sm mt-2">
-              Begin your TanStack Start journey by editing{' '}
-              <code className="px-2 py-1 bg-slate-700 rounded text-cyan-400">
-                /src/routes/index.tsx
-              </code>
+      {/* Hero Section */}
+      <section className="relative py-20 px-6 text-center">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-cyan-500/10 to-emerald-500/10" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl" />
+
+        <div className="relative max-w-4xl mx-auto">
+          {/* Logo/Title */}
+          <div className="flex flex-col items-center gap-4 mb-8">
+            <div className="flex items-center gap-3">
+              <Hammer className="w-12 h-12 text-cyan-400" />
+              <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight">
+                <span className="text-gray-300">GW2</span>{" "}
+                <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                  Economist
+                </span>
+              </h1>
+            </div>
+            <p className="text-xl text-gray-400 max-w-2xl">
+              Should you buy or craft? Find the cheapest way to get any item in
+              Guild Wars 2 with real-time Trading Post prices.
             </p>
           </div>
+
+          {/* Search Bar */}
+          <div className="max-w-2xl mx-auto mb-6">
+            <ItemSearch
+              placeholder="Search for an item... (e.g., Bolt of Silk, Deldrimor Steel)"
+              autoFocus
+              className="w-full"
+            />
+          </div>
+
+          <p className="text-sm text-gray-500">
+            Try searching for crafting materials, weapons, armor, or any
+            craftable item
+          </p>
         </div>
       </section>
 
-      <section className="py-16 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Features Section */}
+      <section className="py-16 px-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10"
+              className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-cyan-500/50 transition-all duration-300"
             >
               <div className="mb-4">{feature.icon}</div>
               <h3 className="text-xl font-semibold text-white mb-3">
@@ -134,6 +109,66 @@ function App() {
           ))}
         </div>
       </section>
+
+      {/* How It Works */}
+      <section className="py-16 px-6 max-w-4xl mx-auto">
+        <h2 className="text-3xl font-bold text-white text-center mb-12">
+          How It Works
+        </h2>
+
+        <div className="space-y-8">
+          <Step
+            number={1}
+            title="Search for an Item"
+            description="Type the name of any item you want to craft. We'll show you matching items with their current Trading Post prices."
+          />
+          <Step
+            number={2}
+            title="View the Analysis"
+            description="See a complete breakdown of materials needed, including nested recipes. We recursively analyze sub-components to find the optimal strategy."
+          />
+          <Step
+            number={3}
+            title="Make Your Decision"
+            description="Get a clear recommendation: Buy the item directly, or craft it from materials. We show you exactly how much you'll save either way."
+          />
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 border-t border-slate-800">
+        <div className="max-w-6xl mx-auto text-center text-gray-500 text-sm">
+          <p>
+            Prices updated hourly from the GW2 Trading Post API. Not affiliated
+            with ArenaNet.
+          </p>
+        </div>
+      </footer>
     </div>
-  )
+  );
+}
+
+/**
+ * Step component for the "How It Works" section.
+ */
+function Step({
+  number,
+  title,
+  description,
+}: {
+  number: number;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex gap-6 items-start">
+      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center text-white font-bold text-xl">
+        {number}
+      </div>
+      <div>
+        <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
+        <p className="text-gray-400">{description}</p>
+      </div>
+    </div>
+  );
 }

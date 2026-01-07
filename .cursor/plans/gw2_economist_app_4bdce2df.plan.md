@@ -1,6 +1,6 @@
 ---
 name: GW2 Economist App
-overview: Build a full-stack TanStack Start application with Drizzle ORM and PostgreSQL that fetches Guild Wars 2 trading post and recipe data, caches it locally, and helps users determine whether to buy or craft items based on market prices.
+overview: Build a full-stack TanStack Start application with Drizzle ORM and PostgreSQL that fetches Guild Wars 2 trading post and recipe data, caches it locally, and helps users determine whether to buy or craft items based on market prices. Uses TDD methodology—tests are written before implementation for each feature.
 todos:
   - id: project-setup
     content: Initialize TanStack Start project with pnpm and install dependencies
@@ -11,12 +11,12 @@ todos:
     dependencies:
       - project-setup
   - id: db-schema
-    content: Define Drizzle schema for items, recipes, and prices tables
+    content: Define Drizzle schema for items, recipes, and prices tables (tests first)
     status: pending
     dependencies:
       - docker-db
   - id: gw2-api-client
-    content: Implement GW2 API client with file cache toggle
+    content: Implement GW2 API client with file cache toggle (tests first)
     status: pending
     dependencies:
       - project-setup
@@ -27,25 +27,20 @@ todos:
       - db-schema
       - gw2-api-client
   - id: craft-calculator
-    content: Build craft cost calculator service with recursive recipe analysis
+    content: Build craft cost calculator service with recursive recipe analysis (tests first)
     status: pending
     dependencies:
       - db-schema
   - id: server-functions
-    content: Create TanStack Start server functions for item search and analysis
+    content: Create TanStack Start server functions for item search and analysis (tests first)
     status: pending
     dependencies:
       - craft-calculator
   - id: frontend-ui
-    content: Build search UI and craft analysis display components
+    content: Build search UI and craft analysis display components (tests first)
     status: pending
     dependencies:
       - server-functions
-  - id: tests
-    content: Write unit and integration tests following TDD approach
-    status: pending
-    dependencies:
-      - project-setup
 ---
 
 # Guild Wars 2 Economist Application
@@ -90,6 +85,24 @@ graph TB
 ```
 
 
+
+## TDD Methodology
+
+This project follows **Test-Driven Development (TDD)**. For each feature:
+
+1. **Red**: Write a failing test that defines expected behavior
+2. **Green**: Write minimal code to make the test pass
+3. **Refactor**: Clean up code while keeping tests green
+
+### Test Categories
+
+| Category | Tools | Purpose ||----------|-------|---------|| Unit Tests | Vitest | Pure logic: craft calculator, price formatting, cache adapter || Integration Tests | Vitest + test DB | Database queries, API client with mocked responses || Component Tests | Vitest + Testing Library | React components with user interactions |
+
+### Test File Conventions
+
+- Test files live alongside source: `*.test.ts` or in `tests/` directory
+- Use descriptive test names: `it('recommends buying when market price is lower than craft cost')`
+- Mock external dependencies (GW2 API, database) for unit tests
 
 ## Project Structure
 
@@ -192,27 +205,72 @@ Create `.env.example` with all required variables:
 
 ```env
 DATABASE_URL=postgres://gw2economist:gw2economist@localhost:5432/gw2economist
-GW2_API_KEY=your_api_key_here
 USE_FILE_CACHE=true
 CACHE_DIR=./cache
 SYNC_INTERVAL_HOURS=1
 ```
 
-
+> **Note**: No API key required! The endpoints we use (`/v2/items`, `/v2/recipes`, `/v2/commerce/prices`) are public.
 
 ## Phase 2: Database Layer
 
-### 2.1 Drizzle Schema
+### 2.1 Tests First: Schema Validation
+
+Write tests before implementing the schema:
+
+```typescript
+// tests/db/schema.test.ts
+describe('Database Schema', () => {
+  it('items table has required columns', () => {
+    // Verify schema exports have correct column definitions
+  })
+  
+  it('recipes ingredients column accepts valid JSON structure', () => {
+    // Test JSON serialization/deserialization
+  })
+  
+  it('prices table has composite key on itemId', () => {
+    // Verify primary key constraints
+  })
+})
+```
+
+
+
+### 2.2 Drizzle Schema
 
 Define schema in `server/db/schema.ts` with three main tables:| Table | Purpose | Key Fields ||-------|---------|------------|| `items` | All GW2 items | id, name, type, rarity, icon, vendorValue || `recipes` | Crafting recipes | id, outputItemId, outputCount, disciplines, ingredients (JSON) || `prices` | Trading post prices | itemId, buyPrice, sellPrice, supply, demand, updatedAt |
 
-### 2.2 Database Client
+### 2.3 Database Client
 
 Create `server/db/index.ts` using Drizzle with the postgres driver, configured via `DATABASE_URL` environment variable.
 
 ## Phase 3: GW2 API Integration
 
-### 3.1 API Client with Cache Toggle
+### 3.1 Tests First: API Client & Cache
+
+Write tests before implementing:
+
+```typescript
+// tests/services/gw2-api/cache.test.ts
+describe('CacheAdapter', () => {
+  it('returns null for missing cache entries', async () => {})
+  it('stores and retrieves data correctly', async () => {})
+  it('respects TTL and expires old entries', async () => {})
+})
+
+// tests/services/gw2-api/client.test.ts
+describe('GW2ApiClient', () => {
+  it('fetches items by ID array', async () => {})
+  it('uses cache when USE_FILE_CACHE is true', async () => {})
+  it('batches requests in chunks of 200', async () => {})
+  it('handles rate limiting with retry', async () => {})
+})
+```
+
+
+
+### 3.2 API Client with Cache Toggle
 
 Implement `server/services/gw2-api/client.ts`:
 
@@ -228,7 +286,7 @@ Key endpoints to integrate:
 - `GET /v2/recipes` - Recipe data  
 - `GET /v2/commerce/prices` - Trading post prices
 
-### 3.2 File Cache Implementation
+### 3.3 File Cache Implementation
 
 Create `server/services/gw2-api/cache.ts`:
 
@@ -280,7 +338,45 @@ The hourly sync can be triggered via cron job or external scheduler using `pnpm 
 
 ## Phase 5: Craft Calculator Service
 
-### 5.1 Core Algorithm
+### 5.1 Tests First: Craft Calculator Logic
+
+This is the core business logic—write comprehensive tests first:
+
+```typescript
+// tests/services/craft-calculator.test.ts
+describe('CraftCalculatorService', () => {
+  it('recommends buying when market price is lower than craft cost', async () => {
+    // Given: Item costs 100c to buy, materials cost 150c
+    // When: Analyze craft cost
+    // Then: Recommendation is 'buy', savings = 50c
+  })
+  
+  it('recommends crafting when cheaper than buying', async () => {
+    // Given: Item costs 200c to buy, materials cost 120c
+    // When: Analyze craft cost
+    // Then: Recommendation is 'craft', savings = 80c
+  })
+  
+  it('handles recursive recipes correctly', async () => {
+    // Given: Item A requires Item B, which requires Item C
+    // When: Analyze craft cost
+    // Then: Returns full material tree with nested costs
+  })
+  
+  it('uses buy price when sub-material is cheaper to buy than craft', async () => {
+    // Given: Sub-material craft cost > buy price
+    // When: Analyze parent item
+    // Then: Uses buy price for that sub-material
+  })
+  
+  it('returns null for items without recipes', async () => {})
+  it('handles items with no trading post listing', async () => {})
+})
+```
+
+
+
+### 5.2 Core Algorithm
 
 Implement `server/services/craft-calculator.service.ts`:
 
@@ -307,7 +403,7 @@ interface MaterialBreakdown {
 
 The calculator recursively analyzes nested recipes (e.g., Bolt of Gossamer requires Gossamer Scraps, which might be craftable from something else).
 
-### 5.2 Server Functions
+### 5.3 Server Functions
 
 Create server functions in `server/functions/craft-analysis.ts`:
 
@@ -329,51 +425,45 @@ export const searchItems = createServerFn({ method: 'GET' })
 
 ## Phase 6: Frontend UI
 
-### 6.1 Routes
+### 6.1 Tests First: Component Tests
+
+Write component tests before building the UI:
+
+```typescript
+// tests/components/PriceDisplay.test.tsx
+describe('PriceDisplay', () => {
+  it('formats 12345 copper as 1g 23s 45c', () => {})
+  it('omits gold when value is less than 100s', () => {})
+  it('handles zero value', () => {})
+})
+
+// tests/components/ItemSearch.test.tsx
+describe('ItemSearch', () => {
+  it('shows loading state while searching', () => {})
+  it('displays search results', () => {})
+  it('navigates to item detail on selection', () => {})
+})
+
+// tests/components/CraftAnalysis.test.tsx
+describe('CraftAnalysis', () => {
+  it('displays buy recommendation with green highlight', () => {})
+  it('displays craft recommendation with blue highlight', () => {})
+  it('shows material breakdown tree', () => {})
+})
+```
+
+
+
+### 6.2 Routes
 
 | Route | Component | Purpose ||-------|-----------|---------|| `/` | Home | Item search with autocomplete || `/items/:itemId` | ItemDetail | Craft analysis display |
 
-### 6.2 Components
+### 6.3 Components
 
 - **ItemSearch**: Autocomplete search using server function
 - **CraftAnalysis**: Displays buy vs craft comparison with visual breakdown
 - **PriceDisplay**: Formats GW2 currency (gold/silver/copper)
 - **MaterialTree**: Recursive display of material requirements
-
-## Phase 7: Testing Strategy (TDD)
-
-### 7.1 Test Setup
-
-Configure Vitest with:
-
-- `vitest.config.ts` for test configuration
-- `tests/setup.ts` for database mocks and test utilities
-
-### 7.2 Test Categories
-
-1. **Unit Tests**: Craft calculator logic, price formatting, cache adapter
-2. **Integration Tests**: Database queries, API client with mocked responses
-3. **Component Tests**: React components with Testing Library
-
-Example test for craft calculator:
-
-```typescript
-describe('CraftCalculatorService', () => {
-  it('recommends buying when cheaper than crafting', async () => {
-    // Given: Item costs 100c, materials cost 150c
-    // When: Analyze craft cost
-    // Then: Recommendation is 'buy'
-  })
-  
-  it('handles recursive recipes', async () => {
-    // Given: Item A requires Item B, which requires Item C
-    // When: Analyze craft cost
-    // Then: Returns full material tree
-  })
-})
-```
-
-
 
 ## Data Flow Diagram
 
@@ -401,14 +491,8 @@ sequenceDiagram
     CraftCalc->>DB: Get recipe + material prices
     CraftCalc-->>ServerFn: CraftAnalysis result
     ServerFn-->>UI: Display recommendation
+
+
+
+
 ```
-
-
-
-## Implementation Order
-
-Execute phases in order, with tests written before implementation (TDD):
-
-1. Phase 1: Project setup and dependencies
-2. Phase 2: Database schema and migrations
-3. Phase 3: GW2 API client with caching
