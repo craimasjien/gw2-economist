@@ -308,19 +308,46 @@ export class TrendAnalysisService {
   }
 
   /**
-   * Calculates the average daily volume from history.
+   * Estimates daily trading volume from quantity changes between snapshots.
    *
-   * @param history - Price history records
-   * @returns Average daily sell quantity
+   * This method tracks decreases in sellQuantity between consecutive snapshots
+   * to estimate how many items were actually sold. Increases are ignored as
+   * they represent new listings, not sales.
+   *
+   * @param history - Price history records (sorted oldest first)
+   * @returns Estimated items sold in the history period
    */
   private calculateAverageDailyVolume(history: PriceHistory[]): number {
-    if (history.length === 0) {
+    if (history.length < 2) {
       return 0;
     }
 
-    // Average the sell quantities from all snapshots
-    const totalVolume = history.reduce((sum, h) => sum + h.sellQuantity, 0);
-    return Math.round(totalVolume / history.length);
+    // Calculate total items sold by summing decreases in sellQuantity
+    let totalSold = 0;
+
+    for (let i = 1; i < history.length; i++) {
+      const previousQuantity = history[i - 1].sellQuantity;
+      const currentQuantity = history[i].sellQuantity;
+      const delta = previousQuantity - currentQuantity;
+
+      // Only count decreases (items sold), ignore increases (new listings)
+      if (delta > 0) {
+        totalSold += delta;
+      }
+    }
+
+    // Calculate the time span in days
+    const firstTime = history[0].recordedAt.getTime();
+    const lastTime = history[history.length - 1].recordedAt.getTime();
+    const daysCovered = (lastTime - firstTime) / (24 * 60 * 60 * 1000);
+
+    // If less than 1 day of data, return total sold as-is
+    if (daysCovered < 1) {
+      return totalSold;
+    }
+
+    // Extrapolate to daily volume
+    return Math.round(totalSold / daysCovered);
   }
 
   /**

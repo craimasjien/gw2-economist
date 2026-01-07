@@ -24,7 +24,7 @@
  * ```
  */
 
-import { eq, like, sql, gte, desc } from "drizzle-orm";
+import { eq, like, sql, gte, desc, inArray, and } from "drizzle-orm";
 import type { Database } from "../db";
 import { items, recipes, prices, priceHistory } from "../db/schema";
 import type { Item, Recipe, Price, PriceHistory } from "../db/schema";
@@ -32,7 +32,7 @@ import type { DataAccess, QuantityAwareDataAccess } from "./craft-calculator.ser
 import type { GW2Listing } from "./gw2-api/types";
 import { GW2ApiClient } from "./gw2-api/client";
 import { TrendAnalysisService, type TrendDataAccess } from "./trend-analysis.service";
-import type { ProfitScannerDataAccess } from "./profit-scanner.service";
+import type { ProfitScannerDataAccess, RecipeWithPrices } from "./profit-scanner.service";
 
 /**
  * Creates a data access implementation for the given database.
@@ -268,7 +268,10 @@ export function createTrendDataAccess(db: Database): TrendDataAccess {
         .select()
         .from(priceHistory)
         .where(
-          sql`${priceHistory.itemId} = ${itemId} AND ${priceHistory.recordedAt} >= ${fromDate}`
+          and(
+            eq(priceHistory.itemId, itemId),
+            gte(priceHistory.recordedAt, fromDate)
+          )
         )
         .orderBy(priceHistory.recordedAt);
     },
@@ -311,7 +314,84 @@ export function createProfitScannerDataAccess(
       return db
         .select()
         .from(items)
-        .where(sql`${items.id} IN ${uniqueItemIds}`);
+        .where(inArray(items.id, uniqueItemIds));
+    },
+
+    /**
+     * Fast path: Gets recipes with estimated craft costs in batch.
+     * This avoids expensive per-item analysis for initial filtering.
+     */
+    async getRecipesWithPriceEstimates(): Promise<RecipeWithPrices[]> {
+      // Get all recipes
+      const allRecipes = await db.select().from(recipes);
+
+      if (allRecipes.length === 0) {
+        return [];
+      }
+
+      // Collect all item IDs we need (outputs + ingredients)
+      const allItemIds = new Set<number>();
+      for (const recipe of allRecipes) {
+        allItemIds.add(recipe.outputItemId);
+        for (const ing of recipe.ingredients) {
+          allItemIds.add(ing.itemId);
+        }
+      }
+
+      // Batch fetch all items and prices
+      const itemIdArray = [...allItemIds];
+      const [allItems, allPrices] = await Promise.all([
+        db.select().from(items).where(inArray(items.id, itemIdArray)),
+        db.select().from(prices).where(inArray(prices.itemId, itemIdArray)),
+      ]);
+
+      // Build lookup maps
+      const itemMap = new Map(allItems.map((i) => [i.id, i]));
+      const priceMap = new Map(allPrices.map((p) => [p.itemId, p]));
+
+      // Build results with estimated costs
+      const results: RecipeWithPrices[] = [];
+
+      for (const recipe of allRecipes) {
+        const item = itemMap.get(recipe.outputItemId);
+        const price = priceMap.get(recipe.outputItemId);
+
+        // Skip if no item or no sellable price
+        if (!item || !price || price.sellPrice === 0) {
+          continue;
+        }
+
+        // Estimate craft cost from ingredient buy prices
+        let estimatedCraftCost = 0;
+        let hasAllIngredientPrices = true;
+
+        for (const ing of recipe.ingredients) {
+          const ingPrice = priceMap.get(ing.itemId);
+          if (!ingPrice || ingPrice.buyPrice === 0) {
+            hasAllIngredientPrices = false;
+            break;
+          }
+          estimatedCraftCost += ingPrice.buyPrice * ing.count;
+        }
+
+        // Skip if we can't estimate cost
+        if (!hasAllIngredientPrices) {
+          continue;
+        }
+
+        // Adjust for output count
+        estimatedCraftCost = Math.ceil(estimatedCraftCost / recipe.outputItemCount);
+
+        results.push({
+          recipe,
+          item,
+          sellPrice: price.sellPrice,
+          sellQuantity: price.sellQuantity,
+          estimatedCraftCost,
+        });
+      }
+
+      return results;
     },
 
     getRecipesByOutputItem: baseAccess.getRecipesByOutputItem,

@@ -484,40 +484,49 @@ export const getProfitableItems = createServerFn({ method: "GET" })
     return profitableItemsInputSchema.parse(input);
   })
   .handler(async ({ data }): Promise<SerializedProfitableItem[]> => {
-    const dataAccess = createExtendedDataAccess(db);
-    const calculator = new CraftCalculatorService(dataAccess);
+    try {
+      const dataAccess = createExtendedDataAccess(db);
+      const calculator = new CraftCalculatorService(dataAccess);
 
-    // Create a function to get craft cost for an item
-    const getCraftCost = async (itemId: number): Promise<number | null> => {
-      const analysis = await calculator.analyze(itemId);
-      return analysis?.craftCost ?? null;
-    };
+      // Create a function to get craft cost for an item
+      const getCraftCost = async (itemId: number): Promise<number | null> => {
+        try {
+          const analysis = await calculator.analyze(itemId);
+          return analysis?.craftCost ?? null;
+        } catch {
+          return null;
+        }
+      };
 
-    const profitScannerAccess = createProfitScannerDataAccess(db, getCraftCost);
-    const scanner = new ProfitOpportunityScannerService(profitScannerAccess);
+      const profitScannerAccess = createProfitScannerDataAccess(db, getCraftCost);
+      const scanner = new ProfitOpportunityScannerService(profitScannerAccess);
 
-    const results = await scanner.getTopProfitableItems({
-      limit: data.limit,
-      minDailyVolume: data.minDailyVolume,
-      minProfitMargin: data.minProfitMargin,
-      disciplines: data.disciplines,
-    });
+      const results = await scanner.getTopProfitableItems({
+        limit: data.limit,
+        minDailyVolume: data.minDailyVolume,
+        minProfitMargin: data.minProfitMargin,
+        disciplines: data.disciplines,
+      });
 
-    return results.map((item) => ({
-      item: serializeItem(item.item),
-      recipe: {
-        id: item.recipe.id,
-        type: item.recipe.type,
-        outputItemCount: item.recipe.outputItemCount,
-        disciplines: item.recipe.disciplines,
-      },
-      craftCost: item.craftCost,
-      sellPrice: item.sellPrice,
-      profit: item.profit,
-      profitMargin: item.profitMargin,
-      dailyVolume: item.dailyVolume,
-      profitScore: item.profitScore,
-    }));
+      return results.map((item) => ({
+        item: serializeItem(item.item),
+        recipe: {
+          id: item.recipe.id,
+          type: item.recipe.type,
+          outputItemCount: item.recipe.outputItemCount,
+          disciplines: item.recipe.disciplines,
+        },
+        craftCost: item.craftCost,
+        sellPrice: item.sellPrice,
+        profit: item.profit,
+        profitMargin: item.profitMargin,
+        dailyVolume: item.dailyVolume,
+        profitScore: item.profitScore,
+      }));
+    } catch (err) {
+      console.error("Error in getProfitableItems:", err);
+      throw err;
+    }
   });
 
 /**

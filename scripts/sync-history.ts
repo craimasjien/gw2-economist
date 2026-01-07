@@ -12,8 +12,12 @@
  * # Run the sync script
  * pnpm sync:history
  *
+ * # Force snapshot regardless of time
+ * pnpm sync:history -- --force
+ * pnpm sync:history -- -f
+ *
  * # Or with tsx directly
- * npx tsx scripts/sync-history.ts
+ * npx tsx scripts/sync-history.ts --force
  *
  * # Run after price sync (recommended)
  * pnpm sync:all-with-history
@@ -95,33 +99,52 @@ async function insertHistoryBatch(historyBatch: NewPriceHistory[]): Promise<void
 }
 
 /**
- * Main sync function that records price history snapshots.
+ * Parses command line arguments for the --force/-f flag.
+ *
+ * @returns True if force flag is present
  */
-async function syncHistory(): Promise<void> {
+function parseArgs(): { force: boolean } {
+  const args = process.argv.slice(2);
+  const force = args.includes("--force") || args.includes("-f");
+  return { force };
+}
+
+/**
+ * Main sync function that records price history snapshots.
+ *
+ * @param force - If true, skip the time check and always take a snapshot
+ */
+async function syncHistory(force = false): Promise<void> {
   const startTime = Date.now();
   const snapshotTime = new Date();
 
   console.log("📸 Starting price history snapshot...");
+  if (force) {
+    console.log("⚡ Force mode enabled - skipping time check");
+  }
   console.log("━".repeat(50));
 
-  // Step 1: Check if we should take a snapshot
-  console.log("🔍 Checking last snapshot time...");
-  const lastSnapshot = await getLastSnapshotTime();
+  // Step 1: Check if we should take a snapshot (unless force mode)
+  if (!force) {
+    console.log("🔍 Checking last snapshot time...");
+    const lastSnapshot = await getLastSnapshotTime();
 
-  if (lastSnapshot) {
-    const minutesSince = Math.round((Date.now() - lastSnapshot.getTime()) / 60000);
-    console.log(`   Last snapshot: ${minutesSince} minutes ago`);
-  } else {
-    console.log("   No previous snapshots found");
-  }
+    if (lastSnapshot) {
+      const minutesSince = Math.round((Date.now() - lastSnapshot.getTime()) / 60000);
+      console.log(`   Last snapshot: ${minutesSince} minutes ago`);
+    } else {
+      console.log("   No previous snapshots found");
+    }
 
-  if (!shouldTakeSnapshot(lastSnapshot)) {
-    const minutesRemaining = Math.ceil(
-      (MIN_SNAPSHOT_INTERVAL_MS - (Date.now() - lastSnapshot!.getTime())) / 60000
-    );
-    console.log(`\n⏳ Skipping snapshot - next one in ${minutesRemaining} minutes`);
-    console.log("━".repeat(50));
-    return;
+    if (!shouldTakeSnapshot(lastSnapshot)) {
+      const minutesRemaining = Math.ceil(
+        (MIN_SNAPSHOT_INTERVAL_MS - (Date.now() - lastSnapshot!.getTime())) / 60000
+      );
+      console.log(`\n⏳ Skipping snapshot - next one in ${minutesRemaining} minutes`);
+      console.log("   Use --force or -f to override");
+      console.log("━".repeat(50));
+      return;
+    }
   }
 
   // Step 2: Fetch current prices from the prices table
@@ -176,8 +199,9 @@ async function syncHistory(): Promise<void> {
   console.log("━".repeat(50));
 }
 
-// Run the sync
-syncHistory()
+// Parse arguments and run the sync
+const { force } = parseArgs();
+syncHistory(force)
   .then(() => {
     process.exit(0);
   })

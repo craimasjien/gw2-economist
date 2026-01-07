@@ -19,9 +19,13 @@
 
 import "dotenv/config";
 import { db, prices } from "../server/db";
-import { gw2Api } from "../server/services/gw2-api";
-import type { GW2Price } from "../server/services/gw2-api";
+import { GW2ApiClient, type GW2Price } from "../server/services/gw2-api";
 import type { NewPrice } from "../server/db/schema";
+
+/**
+ * API client with price caching disabled to always get fresh data.
+ */
+const gw2Api = new GW2ApiClient({ skipPriceCache: true });
 
 /**
  * Batch size for database upserts.

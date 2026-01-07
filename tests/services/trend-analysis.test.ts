@@ -297,23 +297,26 @@ describe("TrendAnalysisService", () => {
       expect(result!.volumeTrend).toBe("stable");
     });
 
-    it("should calculate average daily volume", async () => {
+    it("should estimate daily volume from quantity deltas", async () => {
       const itemId = 1;
-      const dailyVolume = 500; // Sell quantity per snapshot
 
       mockData.prices.set(itemId, createMockPrice({ itemId, sellPrice: 1000 }));
 
-      // Create exactly 24 hours of history (24 snapshots)
+      // Create 24 hours of history with decreasing sellQuantity (items being sold)
+      // Each hour, 10 items are sold (sellQuantity drops by 10)
       const now = new Date();
       const history: PriceHistory[] = [];
+      const startingQuantity = 500;
+
       for (let i = 0; i < 24; i++) {
         history.push(
           createMockPriceHistory({
             id: i + 1,
             itemId,
             sellPrice: 1000,
-            sellQuantity: dailyVolume,
-            recordedAt: new Date(now.getTime() - i * 60 * 60 * 1000),
+            // Quantity decreases by 10 each hour (10 items sold per hour)
+            sellQuantity: startingQuantity - i * 10,
+            recordedAt: new Date(now.getTime() - (23 - i) * 60 * 60 * 1000),
           })
         );
       }
@@ -322,7 +325,87 @@ describe("TrendAnalysisService", () => {
       const result = await service.getPriceTrend(itemId, 1);
 
       expect(result).not.toBeNull();
-      expect(result!.avgDailyVolume).toBe(dailyVolume);
+      // 23 intervals of 10 items each = 230 items over ~1 day
+      expect(result!.avgDailyVolume).toBe(230);
+    });
+
+    it("should ignore quantity increases when calculating volume (new listings)", async () => {
+      const itemId = 1;
+
+      mockData.prices.set(itemId, createMockPrice({ itemId, sellPrice: 1000 }));
+
+      const now = new Date();
+      // Simulate: 100 sold, then 50 new listings added, then 75 sold
+      mockData.priceHistory = [
+        createMockPriceHistory({
+          id: 1,
+          itemId,
+          sellPrice: 1000,
+          sellQuantity: 500, // Starting point
+          recordedAt: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+        }),
+        createMockPriceHistory({
+          id: 2,
+          itemId,
+          sellPrice: 1000,
+          sellQuantity: 400, // 100 sold
+          recordedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+        }),
+        createMockPriceHistory({
+          id: 3,
+          itemId,
+          sellPrice: 1000,
+          sellQuantity: 450, // 50 new listings added (ignore this)
+          recordedAt: new Date(now.getTime() - 1 * 60 * 60 * 1000),
+        }),
+        createMockPriceHistory({
+          id: 4,
+          itemId,
+          sellPrice: 1000,
+          sellQuantity: 375, // 75 sold
+          recordedAt: now,
+        }),
+      ];
+
+      const result = await service.getPriceTrend(itemId, 1);
+
+      expect(result).not.toBeNull();
+      // Only count decreases: 100 + 75 = 175 items sold
+      expect(result!.avgDailyVolume).toBe(175);
+    });
+
+    it("should return 0 volume when no sales occur", async () => {
+      const itemId = 1;
+
+      mockData.prices.set(itemId, createMockPrice({ itemId, sellPrice: 1000 }));
+
+      const now = new Date();
+      // Quantity only increases (new listings, no sales)
+      mockData.priceHistory = [
+        createMockPriceHistory({
+          id: 1,
+          itemId,
+          sellQuantity: 100,
+          recordedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+        }),
+        createMockPriceHistory({
+          id: 2,
+          itemId,
+          sellQuantity: 150,
+          recordedAt: new Date(now.getTime() - 1 * 60 * 60 * 1000),
+        }),
+        createMockPriceHistory({
+          id: 3,
+          itemId,
+          sellQuantity: 200,
+          recordedAt: now,
+        }),
+      ];
+
+      const result = await service.getPriceTrend(itemId, 1);
+
+      expect(result).not.toBeNull();
+      expect(result!.avgDailyVolume).toBe(0);
     });
   });
 

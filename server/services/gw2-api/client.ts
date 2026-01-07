@@ -98,6 +98,13 @@ export interface GW2ApiClientOptions {
    * Request timeout in milliseconds.
    */
   timeout?: number;
+
+  /**
+   * Skip caching for price data. Useful for historical price snapshots
+   * where you always want fresh data from the API.
+   * @default false
+   */
+  skipPriceCache?: boolean;
 }
 
 /**
@@ -140,6 +147,11 @@ export class GW2ApiClient {
   private readonly timeout: number;
 
   /**
+   * Whether to skip caching for price data.
+   */
+  private readonly skipPriceCache: boolean;
+
+  /**
    * Creates a new GW2ApiClient instance.
    *
    * @param options - Configuration options
@@ -148,6 +160,7 @@ export class GW2ApiClient {
     this.apiKey = options.apiKey ?? process.env.GW2_API_KEY;
     this.cache = options.cache ?? new FileCache();
     this.timeout = options.timeout ?? 30000;
+    this.skipPriceCache = options.skipPriceCache ?? false;
   }
 
   /**
@@ -597,17 +610,23 @@ export class GW2ApiClient {
    */
   async getPrice(id: number): Promise<GW2Price | null> {
     const cacheKey = `prices/${id}`;
-    const cached = await this.cache.get<GW2Price>(cacheKey);
 
-    if (cached) {
-      return cached;
+    // Check cache unless skipPriceCache is enabled
+    if (!this.skipPriceCache) {
+      const cached = await this.cache.get<GW2Price>(cacheKey);
+      if (cached) {
+        return cached;
+      }
     }
 
     try {
       const price = await this.fetchWithRetry<GW2Price>(
         `${GW2_API_BASE}/commerce/prices/${id}`
       );
-      await this.cache.set(cacheKey, price, PRICE_CACHE_TTL);
+      // Only cache if skipPriceCache is disabled
+      if (!this.skipPriceCache) {
+        await this.cache.set(cacheKey, price, PRICE_CACHE_TTL);
+      }
       return price;
     } catch {
       return null;
@@ -623,6 +642,17 @@ export class GW2ApiClient {
   async getPrices(ids: number[]): Promise<GW2Price[]> {
     if (ids.length === 0) {
       return [];
+    }
+
+    // If skipPriceCache is enabled, fetch all directly
+    if (this.skipPriceCache) {
+      const url = `${GW2_API_BASE}/commerce/prices?ids=${ids.join(",")}`;
+      try {
+        return await this.fetchWithRetry<GW2Price[]>(url);
+      } catch (error) {
+        console.error("Failed to fetch prices batch:", error);
+        return [];
+      }
     }
 
     // Check cache first

@@ -112,6 +112,17 @@ export interface ProfitScannerOptions {
 }
 
 /**
+ * Recipe with price data for quick filtering.
+ */
+export interface RecipeWithPrices {
+  recipe: Recipe;
+  item: Item;
+  sellPrice: number;
+  sellQuantity: number;
+  estimatedCraftCost: number;
+}
+
+/**
  * Data access interface for profit scanning.
  *
  * @interface ProfitScannerDataAccess
@@ -121,6 +132,12 @@ export interface ProfitScannerDataAccess {
    * Retrieves all items that have crafting recipes.
    */
   getAllCraftableItems(): Promise<Item[]>;
+
+  /**
+   * Retrieves recipes with pre-calculated price estimates for quick filtering.
+   * This is much faster than analyzing each item individually.
+   */
+  getRecipesWithPriceEstimates?(): Promise<RecipeWithPrices[]>;
 
   /**
    * Retrieves all recipes that produce the given item.
@@ -167,6 +184,10 @@ export class ProfitOpportunityScannerService {
   /**
    * Finds the top profitable items for crafting.
    *
+   * Uses a two-phase approach for performance:
+   * 1. Quick pre-filter using estimated costs (fast)
+   * 2. Full analysis only on promising candidates (slow but accurate)
+   *
    * @param options - Filtering and sorting options
    * @returns Array of profitable items sorted by profit score
    */
@@ -180,13 +201,105 @@ export class ProfitOpportunityScannerService {
       disciplines,
     } = options;
 
+    // Try to use the optimized path if available
+    if (this.dataAccess.getRecipesWithPriceEstimates) {
+      return this.getTopProfitableItemsFast(options);
+    }
+
+    // Fallback to slower method but with early termination
+    return this.getTopProfitableItemsSlow(options);
+  }
+
+  /**
+   * Fast path: Uses pre-calculated estimates for quick filtering.
+   */
+  private async getTopProfitableItemsFast(
+    options: ProfitScannerOptions
+  ): Promise<ProfitableItem[]> {
+    const {
+      limit = 50,
+      minDailyVolume = 0,
+      minProfitMargin = 0,
+      disciplines,
+    } = options;
+
+    const recipesWithPrices = await this.dataAccess.getRecipesWithPriceEstimates!();
+
+    // Quick filter based on estimates
+    const candidates = recipesWithPrices
+      .filter((r) => {
+        // Filter by disciplines if specified
+        if (disciplines && disciplines.length > 0) {
+          if (!r.recipe.disciplines.some((d) => disciplines.includes(d))) {
+            return false;
+          }
+        }
+
+        // Filter by volume
+        if (r.sellQuantity < minDailyVolume) {
+          return false;
+        }
+
+        // Quick profit check using estimate
+        const netSell = r.sellPrice * (1 - TP_TAX_RATE);
+        const estimatedProfit = netSell - r.estimatedCraftCost;
+        const estimatedMargin = netSell > 0 ? estimatedProfit / netSell : 0;
+
+        return estimatedProfit > 0 && estimatedMargin >= minProfitMargin * 0.5; // Use 50% of margin for pre-filter
+      })
+      // Sort by estimated profit potential
+      .sort((a, b) => {
+        const aProfit = a.sellPrice * (1 - TP_TAX_RATE) - a.estimatedCraftCost;
+        const bProfit = b.sellPrice * (1 - TP_TAX_RATE) - b.estimatedCraftCost;
+        return bProfit * Math.sqrt(b.sellQuantity) - aProfit * Math.sqrt(a.sellQuantity);
+      })
+      // Take top candidates for full analysis (3x limit for safety)
+      .slice(0, limit * 3);
+
+    // Full analysis on candidates
+    const profitableItems: ProfitableItem[] = [];
+
+    for (const candidate of candidates) {
+      const result = await this.analyzeItemDirect(candidate, minDailyVolume, minProfitMargin);
+      if (result) {
+        profitableItems.push(result);
+      }
+    }
+
+    // Final sort and limit
+    profitableItems.sort((a, b) => b.profitScore - a.profitScore);
+    return profitableItems.slice(0, limit);
+  }
+
+  /**
+   * Slow path: Analyzes items one by one but with early termination.
+   */
+  private async getTopProfitableItemsSlow(
+    options: ProfitScannerOptions
+  ): Promise<ProfitableItem[]> {
+    const {
+      limit = 50,
+      minDailyVolume = 0,
+      minProfitMargin = 0,
+      disciplines,
+    } = options;
+
     // Get all craftable items
     const craftableItems = await this.dataAccess.getAllCraftableItems();
 
     const profitableItems: ProfitableItem[] = [];
+    let analyzed = 0;
+    const maxAnalyze = 500; // Limit how many items we fully analyze
 
     for (const item of craftableItems) {
+      // Early termination if we've analyzed enough
+      if (analyzed >= maxAnalyze && profitableItems.length >= limit) {
+        break;
+      }
+
       const result = await this.analyzeItem(item, disciplines);
+      analyzed++;
+
       if (!result) {
         continue;
       }
@@ -212,6 +325,60 @@ export class ProfitOpportunityScannerService {
 
     // Apply limit
     return profitableItems.slice(0, limit);
+  }
+
+  /**
+   * Analyzes a pre-filtered candidate item.
+   */
+  private async analyzeItemDirect(
+    candidate: RecipeWithPrices,
+    minDailyVolume: number,
+    minProfitMargin: number
+  ): Promise<ProfitableItem | null> {
+    const { recipe, item, sellPrice, sellQuantity } = candidate;
+
+    // Get actual craft cost (this is the expensive operation)
+    const craftCost = await this.dataAccess.getCraftCost(item.id);
+    if (craftCost === null) {
+      return null;
+    }
+
+    // Get trend data for volume, fallback to current sell quantity if no history or 0 volume
+    const trend = await this.dataAccess.getPriceTrend(item.id);
+    const dailyVolume = trend?.avgDailyVolume || sellQuantity;
+
+    if (dailyVolume < minDailyVolume) {
+      return null;
+    }
+
+    // Calculate profit (after 15% TP tax)
+    const netSellPrice = sellPrice * (1 - TP_TAX_RATE);
+    const profit = Math.round(netSellPrice - craftCost);
+
+    if (profit <= 0) {
+      return null;
+    }
+
+    // Calculate profit margin
+    const profitMargin = netSellPrice > 0 ? profit / netSellPrice : 0;
+
+    if (profitMargin < minProfitMargin) {
+      return null;
+    }
+
+    // Calculate profit score: profit × sqrt(dailyVolume)
+    const profitScore = profit * Math.sqrt(dailyVolume);
+
+    return {
+      item,
+      recipe,
+      craftCost,
+      sellPrice,
+      profit,
+      profitMargin,
+      dailyVolume,
+      profitScore,
+    };
   }
 
   /**
@@ -257,9 +424,9 @@ export class ProfitOpportunityScannerService {
       return null;
     }
 
-    // Get trend data for volume
+    // Get trend data for volume, fallback to current sell quantity if no history or 0 volume
     const trend = await this.dataAccess.getPriceTrend(item.id);
-    const dailyVolume = trend?.avgDailyVolume ?? 0;
+    const dailyVolume = trend?.avgDailyVolume || price.sellQuantity;
 
     // Calculate profit (after 15% TP tax)
     const netSellPrice = price.sellPrice * (1 - TP_TAX_RATE);
